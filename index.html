@@ -1,0 +1,522 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>MC 結構轉 3D 模型</title>
+<style>
+:root{--bg:#f3f3f0;--fg:#1d1d1b;--sf:#fff;--bd:#d6d6d0;--mu:#6a6a64;--ac:#2e7d32;--on:#fff;--st:#e6e6e0;--er:#c62828;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151513;--fg:#ecece7;--sf:#222220;--bd:#3a3a36;--mu:#a0a09a;--ac:#6fcf73;--on:#0d1f0e;--st:#1b1b19;--er:#ef7b73}}
+:root[data-theme="dark"]{--bg:#151513;--fg:#ecece7;--sf:#222220;--bd:#3a3a36;--mu:#a0a09a;--ac:#6fcf73;--on:#0d1f0e;--st:#1b1b19;--er:#ef7b73}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+header,footer{background:var(--sf);padding:8px 12px;display:flex;gap:8px;align-items:center}
+header{border-bottom:1px solid var(--bd)}header b{flex:1;font-size:15px}
+footer{border-top:1px solid var(--bd);flex-direction:column;align-items:stretch;gap:6px}
+button,.btn{font:inherit;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--sf);color:var(--fg);cursor:pointer;text-align:center}
+.pri{background:var(--ac);color:var(--on);border-color:var(--ac);font-weight:600}
+button:disabled{opacity:.4}
+#stage{flex:1;min-height:0;position:relative;background:var(--st)}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mu);pointer-events:none}
+.row{display:flex;gap:8px;align-items:center}.row button{flex:1}
+#ks{width:64px;font:inherit;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
+#info{font-size:13px;color:var(--mu)}#msg{font-size:13px}#msg.err{color:var(--er)}
+details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;padding-left:20px}
+#tp{flex:none;max-height:36vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
+#tp h4{margin:0;font-size:13px;flex:1}.tn{font-size:12px;color:var(--mu);margin:6px 0}
+#tl{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.tc{border:1px solid var(--bd);border-radius:8px;padding:6px;background:var(--bg);font-size:12px;word-break:break-all}
+.th{display:flex;gap:4px;margin-bottom:4px}
+.tc canvas{position:static;inset:auto;width:40px;height:40px;touch-action:auto;image-rendering:pixelated;border:1px solid var(--bd);border-radius:4px;cursor:pointer;background:repeating-conic-gradient(#888 0 25%,#bbb 0 50%) 0 0/8px 8px}
+.tc button{padding:0 6px;font-size:11px}
+</style>
+</head>
+<body>
+<header><b>🧱 MC 結構轉 3D 模型</b><label class="btn pri">匯入結構檔<input type="file" id="fi" hidden></label><button id="bS">範例</button></header>
+<div id="stage"><canvas id="cv"></canvas><div id="hint">點右上「匯入結構檔」選擇 .nbt／.schem／.litematic／.mcstructure，<br>或將檔案拖曳到此處</div></div>
+<section id="tp"><div class="row"><h4 id="tt">方塊材質</h4><label class="btn">匯入材質包<input type="file" id="fz" accept=".zip,.jar" hidden></label><button id="bR">全部還原</button></div>
+<div class="tn">預設會連線到 Mojang 官方 GitHub（Mojang/bedrock-samples）載入原版方塊貼圖；找不到對應貼圖的方塊（如床、旗幟）才使用程式產生的近似貼圖。點縮圖上傳自己的圖片即可替換；「匯入材質包」可讀取你自己的材質包 .zip 或遊戲 .jar（僅在本機處理）。匯出 OBJ 會附上目前使用的貼圖（官方貼圖版權屬 Mojang／Microsoft，請留意使用規範）。</div>
+<div id="tl"></div><input type="file" id="fu" accept="image/*" hidden></section>
+<footer>
+<div id="info">尚未載入結構</div><div id="msg"></div>
+<div class="row"><label>縮放 <input id="ks" type="number" value="1" min="0.001" step="any"></label><button id="bO" disabled>匯出 OBJ</button><button id="bT" disabled>匯出 STL</button></div>
+<details><summary>使用說明</summary><ol>
+<li>在 Minecraft（Java 版）蓋好建築，用結構方塊（/give @s structure_block）框住並選「儲存」。</li>
+<li>檔案在 saves/世界名稱/generated/minecraft/structures/名稱.nbt。也可匯入 WorldEdit 或 Litematica 的 .schem／.litematic。</li>
+<li>基岩版（Bedrock）：用結構方塊框住建築並按「匯出」，會得到 .mcstructure 檔，不必解壓縮，直接匯入即可。樓梯轉角、柵欄／玻璃片的連接與門的開向由程式依相鄰方塊推算；床、旗幟、展示框的顏色與內容取自方塊實體資料。</li>
+<li>匯出為 .zip：OBJ 內含 .obj＋.mtl（依方塊上色，可用 Blender／MeshLab 開啟），STL 無顏色，適合 3D 列印。縮放 1 ＝ 每格 1 單位。</li>
+<li>旗幟的花紋（結構檔內的 Patterns）會以程式繪製的近似圖樣顯示，並非 Mojang 原圖；匯出 OBJ 時會一併輸出旗面貼圖。</li>
+<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li></ol></details>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),say=(t,e)=>{const m=$('#msg');m.textContent=t;m.className=e?'err':''};
+// 6 個面：[鄰格偏移xyz, 4 個角(逆時針), 明暗]
+const D=[[1,0,0,[1,0,0,1,1,0,1,1,1,1,0,1],.8],[-1,0,0,[0,0,1,0,1,1,0,1,0,0,0,0],.8],[0,1,0,[0,1,1,1,1,1,1,1,0,0,1,0],1],[0,-1,0,[0,0,0,1,0,0,1,0,1,0,0,1],.5],[0,0,1,[0,0,1,1,0,1,1,1,1,0,1,1],.65],[0,0,-1,[1,0,0,0,0,0,0,1,0,1,1,0],.65]],Q=[0,1,2,0,2,3];
+let F=[],C=[],N=[],W=0,H=0,L=0,cnt=0,base='model',cb=[],E=[],PK=null,up=null,AC=1,BP={};
+const DY=[['white',0xe9ecec],['orange',0xf07613],['magenta',0xbd44b3],['light_blue',0x3aafd9],['yellow',0xf8c527],['lime',0x70b919],['pink',0xed8dac],['light_gray',0x8e8e86],['gray',0x3e4447],['cyan',0x158991],['purple',0x792aac],['blue',0x35399d],['brown',0x724728],['green',0x546d1b],['red',0xa12722],['black',0x141519]];
+const KW=[['water',0x3f76e4],['lava',0xf97316],['grass_block',0x5d9b3a],['leaves',0x3c7a2a],['grass',0x6fa84a],['fern',0x5b9440],['moss',0x59732e],['podzol',0x5b4021],['dirt',0x866043],['mud',0x3a3a3f],['red_sand',0xbe6621],['sand',0xdbcf9e],['gravel',0x857f7c],['snow',0xf6fafa],['ice',0x9ec3f5],['cobble',0x7f7f7f],['stone_brick',0x7a7a7a],['deepslate',0x4a4a50],['sandstone',0xd8cb9b],['andesite',0x888888],['diorite',0xc8c8c8],['granite',0x9a6b5a],['stone',0x7d7d7d],['nether_brick',0x2d171b],['netherrack',0x6f3636],['nether',0x4a1c1c],['obsidian',0x15101f],['glowstone',0xf7d17a],['lantern',0xf0b45a],['torch',0xf0c050],['glass',0xbfe3ea],['quartz',0xece6df],['prismarine',0x5aa393],['gold',0xf5d63d],['iron',0xd8d8d8],['diamond',0x62e8d9],['emerald',0x2cc058],['redstone',0xb01808],['coal',0x2b2b2b],['copper',0xc0704f],['terracotta',0x9e5c43],['brick',0x976553],['dark_oak',0x3f2a14],['spruce',0x6f5330],['birch',0xcfc08a],['jungle',0xa0734a],['acacia',0xb15f35],['mangrove',0x7a3c3c],['cherry',0xe5b4b6],['bamboo',0xc6b34a],['crimson',0x7a2c46],['warped',0x2b8a82],['oak',0xb08c55],['log',0x6a5230],['plank',0xb08c55],['wood',0x8a6a3c]];
+// ---------- 旗幟花紋 ----------
+const DYE=['white','orange','magenta','light_blue','yellow','lime','pink','gray','light_gray','cyan','purple','blue','brown','green','red','black'],
+LGC={bl:'square_bottom_left',br:'square_bottom_right',tl:'square_top_left',tr:'square_top_right',bs:'stripe_bottom',ts:'stripe_top',ls:'stripe_left',rs:'stripe_right',cs:'stripe_center',ms:'stripe_middle',drs:'stripe_downright',dls:'stripe_downleft',ss:'small_stripes',cr:'cross',sc:'straight_cross',bt:'triangle_bottom',tt:'triangle_top',bts:'triangles_bottom',tts:'triangles_top',ld:'diagonal_left',rd:'diagonal_right',lud:'diagonal_up_left',rud:'diagonal_up_right',mc:'circle',mr:'rhombus',vh:'half_vertical',hh:'half_horizontal',vhr:'half_vertical_right',hhb:'half_horizontal_bottom',bo:'border',cbo:'curly_border',gra:'gradient',gru:'gradient_up',bri:'bricks',gb:'globe',glb:'globe',cre:'creeper',sku:'skull',flo:'flower',moj:'mojang',pig:'piglin',flw:'flow',gus:'guster'},
+BPN=Object.values(LGC),
+// 讀取方塊實體 NBT 的旗幟圖層（舊版 Patterns／1.20.5+ patterns），轉成「圖樣.顏色~圖樣.顏色」字串
+bnp=d=>{const a=d&&(d.patterns||d.Patterns);if(!Array.isArray(a))return'';
+  return a.map(e=>{let c=e.color??e.Color,p=e.pattern??e.Pattern;if(p&&typeof p=='object')p=p.asset_id||p.id;
+    c=typeof c=='number'?DYE[c]:String(c??'').replace(/^minecraft:/,'');p=String(p??'').replace(/^minecraft:/,'');p=LGC[p]||p;
+    return BPN.includes(p)&&DYE.includes(c)?p+'.'+c:''}).filter(Boolean).join('~')};
+function col(n){n=n.replace(/^.*:/,'');const w='_'+n+'_';
+  for(const[k,v]of DY)if(w.includes('_'+k+'_'))return v;
+  for(const[k,v]of KW)if(n.includes(k))return v;
+  let h=7;for(const c of n)h=Math.imul(h,31)+c.charCodeAt(0)|0;return(Math.abs(h)&0xffffff)|0x505050}
+
+// ---------- NBT ----------
+function nbt(u,le){ // le：true＝小端序（基岩版 .mcstructure）
+  const dv=new DataView(u.buffer,u.byteOffset,u.byteLength),td=new TextDecoder();let p=0;
+  const str=()=>{const n=dv.getUint16(p,le);p+=2;const s=td.decode(u.subarray(p,p+n));p+=n;return s};
+  const rd=t=>{switch(t){
+    case 1:return dv.getInt8(p++);
+    case 2:p+=2;return dv.getInt16(p-2,le);
+    case 3:p+=4;return dv.getInt32(p-4,le);
+    case 4:p+=8;return dv.getBigInt64(p-8,le);
+    case 5:p+=4;return dv.getFloat32(p-4,le);
+    case 6:p+=8;return dv.getFloat64(p-8,le);
+    case 7:{const n=dv.getInt32(p,le);p+=4+n;return u.subarray(p-n,p)}
+    case 8:return str();
+    case 9:{const t2=dv.getInt8(p++),n=dv.getInt32(p,le),a=[];p+=4;for(let i=0;i<n;i++)a.push(rd(t2));return a}
+    case 10:{const o={};for(;;){const t2=dv.getInt8(p++);if(!t2)return o;o[str()]=rd(t2)}}
+    case 11:{const n=dv.getInt32(p,le),a=[];p+=4;for(let i=0;i<n;i++){a.push(dv.getInt32(p,le));p+=4}return a}
+    case 12:{const n=dv.getInt32(p,le),a=new BigUint64Array(n);p+=4;for(let i=0;i<n;i++){a[i]=dv.getBigUint64(p,le);p+=8}return a}
+  }throw Error('NBT 格式錯誤')};
+  if(dv.getInt8(p++)!=10)throw Error('不是 NBT 檔');str();return rd(10)}
+async function gunzip(u){
+  if(window.DecompressionStream)return new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  if(window.pako)return pako.ungzip(u);throw Error('瀏覽器不支援解壓縮')}
+
+// 轉成 {pal:[方塊名], B:[x,y,z,palIdx,...]}，支援 vanilla .nbt / Sponge .schem / .litematic / 基岩版 .mcstructure
+function fromNBT(r){
+  if(r.structure&&r.structure.block_indices)return fromBE(r);
+  const pal=[],live=[],ix=new Map(),B=[],pr=q=>q.Properties&&Object.entries(q.Properties).map(e=>e.join('=')).join(','),
+  gi=(n,s)=>{n=n.replace(/^minecraft:/,'');const k=PT.test(n)&&s?n+'['+s+']':n;let i=ix.get(k);if(i==null){i=pal.length;pal.push(k);ix.set(k,i);live[i]=!/(^|_)air$|structure_void/.test(n)}return i},
+  bpal=(n,s,k)=>gi(n,(s?s+',':'')+'pat='+k),pb=(n,s,t)=>{const k=/banner$/.test(n)?bnp(t):'';return k?bpal(n,s,k):null},
+  FD=['down','up','north','south','west','east'],fr=(id,x,y,z,d)=>{id=String(id||'').replace(/^minecraft:/,'');const f=FD[d.Facing];if(/item_frame$/.test(id)&&f){const it=String(d.Item?.id||'').replace(/^minecraft:/,'');B.push(Math.floor(x),Math.floor(y),Math.floor(z),gi(id,'facing='+f+(it?',item='+it:'')))}};
+  const P=r.palette||(r.palettes&&r.palettes[0]);
+  if(P&&r.blocks){const pm=P.map(q=>gi(q.Name,pr(q)));for(const b of r.blocks){let p=pm[b.state];if(b.nbt){const q=P[b.state],t=pb(q.Name,pr(q),b.nbt);if(t!=null)p=t}if(live[p])B.push(b.pos[0],b.pos[1],b.pos[2],p)}for(const e of r.entities||[]){const q=e.blockPos||e.pos,d=e.nbt||{};q&&fr(d.id,q[0],q[1],q[2],d)}}
+  else if(r.Regions){for(const g of Object.values(r.Regions)){
+    const{x:sx,y:sy,z:sz}=g.Size,{x:px,y:py,z:pz}=g.Position,ax=Math.abs(sx),ay=Math.abs(sy),az=Math.abs(sz),
+    ox=px+(sx<0?sx+1:0),oy=py+(sy<0?sy+1:0),oz=pz+(sz<0?sz+1:0),
+    Pl=g.BlockStatePalette,lb=Pl.map(q=>/banner$/.test(q.Name)),bm=new Map(),lp=Pl.map(q=>gi(q.Name,pr(q))),bits=BigInt(Math.max(2,32-Math.clz32(lp.length-1))),mask=(1n<<bits)-1n,S=g.BlockStates;
+    for(const e of g.TileEntities||[]){const k=bnp(e);if(k)bm.set(e.x+','+e.y+','+e.z,k)}
+    for(let y=0;y<ay;y++)for(let z=0;z<az;z++)for(let x=0;x<ax;x++){
+      const s=BigInt((y*az+z)*ax+x)*bits,i=Number(s>>6n),o=s&63n;let v=S[i]>>o;if(o+bits>64n)v|=S[i+1]<<(64n-o);
+      const ii=Number(v&mask);let p=lp[ii];if(bm.size&&lb[ii]){const k=bm.get(x+','+y+','+z);if(k)p=bpal(Pl[ii].Name,pr(Pl[ii]),k)}if(live[p])B.push(ox+x,oy+y,oz+z,p)}for(const e of g.Entities||[])e.Pos&&fr(e.id,px+e.Pos[0],py+e.Pos[1],pz+e.Pos[2],e)}}
+  else{const s=r.Schematic||r,bl=s.Blocks||s,PP=bl.Palette,dat=bl.Data||bl.BlockData;
+    if(!PP||!dat)throw Error('不支援的格式（支援 .nbt／.schem／.litematic／.mcstructure）');
+    const pm=[],pq=[],bm=new Map();for(const[k,v]of Object.entries(PP)){const m=k.match(/^([^\[]+)(?:\[(.*)\])?/);pm[v]=gi(m[1],m[2]);if(/banner$/.test(m[1]))pq[v]=[m[1],m[2]]}
+    for(const e of bl.BlockEntities||s.BlockEntities||[]){const k=bnp(e.Data||e);if(k&&e.Pos)bm.set(e.Pos.join(','),k)}
+    let i=0;for(let y=0;y<s.Height;y++)for(let z=0;z<s.Length;z++)for(let x=0;x<s.Width;x++){let v=0,sh=0,b;do{b=dat[i++];v|=(b&127)<<sh;sh+=7}while(b&128);let p=pm[v];if(bm.size&&pq[v]){const k=bm.get(x+','+y+','+z);if(k)p=bpal(pq[v][0],pq[v][1],k)}if(live[p])B.push(x,y,z,p)}for(const e of s.Entities||[]){const d=e.Data||e;e.Pos&&fr(e.Id||d.id,e.Pos[0],e.Pos[1],e.Pos[2],d)}}
+  return{pal,B}}
+function sample(){const pal=['stone_bricks','oak_planks','glass','dark_oak_planks','grass_block','red_wool','oak_slab[type=bottom]','oak_stairs[facing=east,half=bottom,shape=straight]','oak_stairs[facing=east,half=bottom,shape=outer_left]','oak_fence[north=false,south=false,east=true,west=false]','oak_fence[north=false,south=false,east=true,west=true]','oak_fence[north=false,south=false,east=false,west=true]','wall_torch[facing=east]','torch','red_bed[facing=east,part=head]','red_bed[facing=east,part=foot]','oak_door[facing=south,half=lower,hinge=left,open=false]','oak_door[facing=south,half=upper,hinge=left,open=false]','red_wall_banner[facing=west,pat=stripe_middle.white~stripe_center.white~circle.red]','item_frame[facing=south,item=diamond]','red_banner[rotation=0,pat=rhombus.yellow~circle.black~border.black]','green_banner[rotation=4,pat=creeper.black~border.lime]'],B=[];
+  for(let x=-2;x<13;x++)for(let z=-2;z<13;z++)B.push(x,0,z,4);
+  for(let x=0;x<11;x++)for(let z=0;z<11;z++){B.push(x,1,z,1);
+    if(x%10==0||z%10==0)for(let y=2;y<6;y++){if(x==5&&z==0&&y<4)continue;B.push(x,y,z,(y==3&&((x%10==0&&z%3==2)||(z%10==0&&x%3==2)))?2:0)}}
+  for(let k=0;k<6;k++)for(let x=k-1;x<12-k;x++)for(let z=k-1;z<12-k;z++)B.push(x,6+k,z,3);
+  for(let y=7;y<13;y++)B.push(8,y,8,0);
+  for(let y=12;y<16;y++)B.push(5,y,5,1);B.push(6,15,5,5,6,14,5,5);
+  B.push(-1,1,4,7,-1,1,6,6,-1,1,8,8,2,1,-1,9,3,1,-1,10,4,1,-1,11);B.push(1,3,3,12,3,2,5,13,7,2,7,14,6,2,7,15,5,2,0,16,5,3,0,17,9,3,4,18,3,3,1,19,2,2,8,20,8,2,2,21);
+  return{pal,B}}
+
+// ---------- 基岩版 .mcstructure（小端序 NBT）----------
+// 判斷 NBT 位元組順序：Java 版為大端、基岩版為小端（兩種讀法中，標籤名稱長度較合理的勝出）
+function isLE(u){
+  const t=le=>{const g=i=>le?u[i]|u[i+1]<<8:u[i]<<8|u[i+1],r=g(1);return r+(u[3+r]?g(4+r):0)};
+  return t(1)<t(0)}
+// 轉成 {pal,B}：方塊名稱／狀態轉成 Java 風格；樓梯轉角、柵欄／玻璃片連接、門的樞紐與開關由相鄰方塊推算
+// 索引順序：index=(x*Y+y)*Z+z；第二層（含水）只在第一層為空氣時採用
+function fromBE(r){
+  const[X,Y,Z]=r.size||[],S=r.structure,PD=S.palette&&(S.palette.default||Object.values(S.palette)[0]),Pl=PD&&PD.block_palette,bi=S.block_indices;
+  if(!(X>0&&Y>0&&Z>0)||!Pl||!Array.isArray(bi)||!Array.isArray(bi[0]))throw Error('.mcstructure 內容不完整');
+  const l0=bi[0],l1=Array.isArray(bi[1])?bi[1]:[],np=Pl.length,n0=X*Y*Z;
+  if(l0.length!=n0)throw Error('方塊數量與尺寸不符');
+  const BD4=['east','west','south','north'],BFD=['down','up','north','south','west','east'],BBD=['south','west','north','east'],ND=['north','east','south','west'],
+  OPP={east:'west',west:'east',north:'south',south:'north'},CCW={north:'west',west:'south',south:'east',east:'north'},VEC={east:[1,0],west:[-1,0],south:[0,1],north:[0,-1]},
+  BAN=DYE.slice().reverse(), // 旗幟的顏色編號與床／羊毛相反：0＝黑 … 15＝白
+  cn=c=>({silver:'light_gray'}[c]||c||'white'),wd=s=>s.wood_type||'oak',
+  SLT={wood:'petrified_oak',prismarine_rough:'prismarine',prismarine_dark:'dark_prismarine'},
+  // 扁平化之前的舊版方塊（名稱＋狀態 → Java 名稱）
+  LEG={planks:s=>wd(s)+'_planks',log:s=>(s.old_log_type||'oak')+'_log',log2:s=>(s.new_log_type||'acacia')+'_log',leaves:s=>(s.old_leaf_type||'oak')+'_leaves',leaves2:s=>(s.new_leaf_type||'acacia')+'_leaves',
+    wood:s=>(s.stripped_bit?'stripped_':'')+wd(s)+'_wood',wooden_slab:s=>wd(s)+'_slab',double_wooden_slab:s=>wd(s)+'_slab',fence:s=>wd(s)+'_fence',
+    wool:s=>cn(s.color)+'_wool',carpet:s=>cn(s.color)+'_carpet',concrete:s=>cn(s.color)+'_concrete',concretePowder:s=>cn(s.color)+'_concrete_powder',
+    stained_glass:s=>cn(s.color)+'_stained_glass',stained_glass_pane:s=>cn(s.color)+'_stained_glass_pane',stained_hardened_clay:s=>cn(s.color)+'_terracotta',
+    stone:s=>({granite:'granite',granite_smooth:'polished_granite',diorite:'diorite',diorite_smooth:'polished_diorite',andesite:'andesite',andesite_smooth:'polished_andesite'})[s.stone_type]||'stone',
+    dirt:s=>s.dirt_type=='coarse'?'coarse_dirt':'dirt',sand:s=>s.sand_type=='red'?'red_sand':'sand',
+    sandstone:s=>({heiroglyphs:'chiseled_sandstone',cut:'cut_sandstone',smooth:'smooth_sandstone'})[s.sand_stone_type]||'sandstone',
+    red_sandstone:s=>({heiroglyphs:'chiseled_red_sandstone',cut:'cut_red_sandstone',smooth:'smooth_red_sandstone'})[s.sand_stone_type]||'red_sandstone',
+    stonebrick:s=>({mossy:'mossy_stone_bricks',cracked:'cracked_stone_bricks',chiseled:'chiseled_stone_bricks',smooth:'smooth_stone'})[s.stone_brick_type]||'stone_bricks',
+    quartz_block:s=>({chiseled:'chiseled_quartz_block',lines:'quartz_pillar',smooth:'smooth_quartz'})[s.chisel_type]||'quartz_block',
+    cobblestone_wall:s=>({mossy_cobblestone:'mossy_cobblestone_wall',granite:'granite_wall',diorite:'diorite_wall',andesite:'andesite_wall',sandstone:'sandstone_wall',brick:'brick_wall',stone_brick:'stone_brick_wall',mossy_stone_brick:'mossy_stone_brick_wall',nether_brick:'nether_brick_wall',end_brick:'end_stone_brick_wall',prismarine:'prismarine_wall',red_sandstone:'red_sandstone_wall',red_nether_brick:'red_nether_brick_wall'})[s.wall_block_type]||'cobblestone_wall'},
+  // 名稱與 Java 版不同的方塊
+  BRN={grass:'grass_block',grass_path:'dirt_path',flowing_water:'water',flowing_lava:'lava',brick_block:'bricks',nether_brick:'nether_bricks',red_nether_brick:'red_nether_bricks',end_bricks:'end_stone_bricks',snow:'snow_block',snow_layer:'snow',web:'cobweb',reeds:'sugar_cane',waterlily:'lily_pad',lit_pumpkin:'jack_o_lantern',lit_furnace:'furnace',lit_redstone_lamp:'redstone_lamp',magma:'magma_block',slime:'slime_block',noteblock:'note_block',hardened_clay:'terracotta',wooden_door:'oak_door',frame:'item_frame',glow_frame:'glow_item_frame',unlit_redstone_torch:'redstone_torch',stone_stairs:'cobblestone_stairs',normal_stone_stairs:'stone_stairs'},
+  // 調色盤項目 → {n:Java 名稱, p:Java 屬性, k:需要額外處理的種類, d:原始資料}
+  bconv=q=>{
+    let n=String(q.name||'').replace(/^minecraft:/,''),s={},p={},k=null,d=null,m;
+    for(const e in q.states||{})s[e.replace(/^minecraft:/,'')]=q.states[e];
+    if(m=n.match(/^(double_)?stone_block_slab(\d?)$/)){const v=s['stone_slab_type'+(m[2]?'_'+m[2]:'')];n=(SLT[v]||v||'stone')+'_slab';if(m[1])p.type='double'}
+    else if(LEG[n]){if(/^double_/.test(n))p.type='double';n=LEG[n](s)}
+    else{if(/_double_slab$/.test(n)){n=n.replace(/_double_slab$/,'_slab');p.type='double'}n=BRN[n]||n}
+    if(/_stairs$/.test(n)){p.facing=BD4[+s.weirdo_direction||0];p.half=s.upside_down_bit?'top':'bottom';k='stair'}
+    else if(/_slab$/.test(n))p.type=p.type||(s.vertical_half=='top'||s.top_slot_bit?'top':'bottom');
+    else if(/_wall$/.test(n)){p.up=s.wall_post_bit?'true':'false';for(const e of ND){const v=s['wall_connection_type_'+e];p[e]=v=='tall'?'tall':v=='short'?'low':'false'}}
+    else if(/_fence$|_pane$|^iron_bars$/.test(n))k='conn';
+    else if(/_door$/.test(n)){k='door';d={f:BD4[+s.direction||0],o:!!s.open_bit,h:!!s.door_hinge_bit,u:!!s.upper_block_bit}}
+    else if(/(^|_)torch$/.test(n)){if(OPP[s.torch_facing_direction]){n=n.replace(/torch$/,'wall_torch');p.facing=OPP[s.torch_facing_direction]}}
+    else if(n=='snow')p.layers=String((+s.height||0)+1);
+    else if(/(^|_)bed$/.test(n)){k='bed';d={f:BBD[+s.direction||0],h:!!s.head_piece_bit,c:n=='bed'?null:n.replace(/_bed$/,'')}}
+    else if(/^(standing|wall)_banner$/.test(n)){k='banner';d={w:n[0]=='w',r:+s.ground_sign_direction||0,f:BFD[+s.facing_direction]||'north'}}
+    else if(/item_frame$/.test(n)){k='frame';d={f:BFD[+s.facing_direction]||'north'}}
+    return{n,p,k,d}},
+  IP=[],ik=new Map(),reg=e=>{const k=e.n+JSON.stringify(e.p)+JSON.stringify(e.d||0);let i=ik.get(k);if(i==null){i=IP.length;IP.push(e);ik.set(k,i)}return i},
+  b0=Pl.map(q=>reg(bconv(q))),air=b0.map(i=>/(^|_)air$|structure_void|^light(_block.*)?$/.test(IP[i].n)),
+  K=new Int32Array(n0).fill(-1),BE=PD.block_position_data||{},bev=c=>BE[c]&&BE[c].block_entity_data;
+  // 第一輪：取出每格的方塊；床、旗幟、展示框的顏色／內容來自方塊實體資料
+  for(let x=0,c=0;x<X;x++)for(let y=0;y<Y;y++)for(let z=0;z<Z;z++,c++){
+    let v=l0[c];if(!(v>=0&&v<np)||air[v]){const w=l1[c];v=w>=0&&w<np&&!air[w]?w:-1}
+    if(v<0)continue;
+    let i=b0[v];const e=IP[i],d=e.d;
+    if(e.k=='bed'){const[dx,dz]=VEC[d.f],o=d.h?-1:1,px=x+o*dx,pz=z+o*dz,g=q=>{const b=bev(q);return b&&typeof b.color=='number'?DYE[b.color&15]:null};
+      i=reg({n:(d.c||g(c)||(px>=0&&pz>=0&&px<X&&pz<Z&&g((px*Y+y)*Z+pz))||'red')+'_bed',p:{facing:d.f,part:d.h?'head':'foot'}})}
+    else if(e.k=='banner'){const b=bev(c)||{},pt=bnp({patterns:(Array.isArray(b.Patterns)?b.Patterns:[]).map(q=>({color:BAN[(q.Color|0)&15],pattern:q.Pattern}))}),
+      p=d.w?{facing:d.f}:{rotation:String(d.r)};if(pt)p.pat=pt;
+      i=reg({n:BAN[(b.Base??15)&15]+(d.w?'_wall_banner':'_banner'),p})}
+    else if(e.k=='frame'){const b=bev(c),it=b&&b.Item&&String(b.Item.Name||'').replace(/^minecraft:/,''),p={facing:d.f};if(it)p.item=it;i=reg({n:e.n,p})}
+    K[c]=i}
+  // 第二輪：樓梯轉角、柵欄／玻璃片連接、門（依相鄰方塊）→ 最終調色盤
+  const pal=[],fx=new Map(),fm=new Map(),B=[],ser=p=>Object.entries(p).map(e=>e.join('=')).join(','),
+  fin=(n,p)=>{const s=ser(p),k=PT.test(n)&&s?n+'['+s+']':n;let i=fx.get(k);if(i==null){i=pal.length;pal.push(k);fx.set(k,i)}return i},
+  at=(x,y,z)=>{if(x<0||y<0||z<0||x>=X||y>=Y||z>=Z)return null;const i=K[(x*Y+y)*Z+z];return i<0?null:IP[i]},
+  ax=d=>d=='east'||d=='west',
+  solid=e=>e.s??=!/leaves|^water$|^lava$|pumpkin|jack_o_lantern|melon|shulker|barrier|^bed$/.test(e.n)&&!bx(e.n,ser(e.p));
+  for(let x=0,c=0;x<X;x++)for(let y=0;y<Y;y++)for(let z=0;z<Z;z++,c++){
+    const i=K[c];if(i<0)continue;const e=IP[i];let f;
+    if(e.k=='stair'){const{facing:fc,half:h}=e.p,[dx,dz]=VEC[fc],ok=o=>o&&o.k=='stair'&&o.p.half==h,
+        can=g=>{const o=at(x+VEC[g][0],y,z+VEC[g][1]);return!(o&&o.k=='stair')||o.p.facing!=fc||o.p.half!=h},
+        fr=at(x+dx,y,z+dz),bk=at(x-dx,y,z-dz);let sh='straight';
+      if(ok(fr)&&ax(fr.p.facing)!=ax(fc)&&can(OPP[fr.p.facing]))sh=fr.p.facing==CCW[fc]?'outer_left':'outer_right';
+      else if(ok(bk)&&ax(bk.p.facing)!=ax(fc)&&can(bk.p.facing))sh=bk.p.facing==CCW[fc]?'inner_left':'inner_right';
+      f=fin(e.n,{...e.p,shape:sh})}
+    else if(e.k=='conn'){const pn=/_pane$|^iron_bars$/.test(e.n),p={},
+        nb=o=>!o?false:pn?/_pane$|^iron_bars$|_wall$/.test(o.n)||solid(o):/_fence$/.test(o.n)?/nether_brick/.test(o.n)==/nether_brick/.test(e.n):solid(o);
+      for(const d of ND)p[d]=String(nb(at(x+VEC[d][0],y,z+VEC[d][1])));
+      f=fin(e.n,p)}
+    else if(e.k=='door'){const d=e.d,lo=d.u?at(x,y-1,z):e,up=d.u?e:at(x,y+1,z),L=lo&&lo.k=='door'&&!lo.d.u?lo.d:d,U=up&&up.k=='door'&&up.d.u?up.d:null;
+      f=fin(e.n,{facing:L.f,hinge:L.h||U&&U.h?'right':'left',open:String(L.o)})}
+    else{f=fm.get(i);if(f==null){f=fin(e.n,e.p);fm.set(i,f)}}
+    B.push(x,y,z,f)}
+  return{pal,B}}
+
+// ---------- 建立網格 ----------
+async function load(pal,B){
+  if(!B.length)return say('沒有找到任何方塊',1);
+  const a=[1e9,1e9,1e9],b=[-1e9,-1e9,-1e9];
+  for(let i=0;i<B.length;i+=4)for(let k=0;k<3;k++){const v=B[i+k];if(v<a[k])a[k]=v;if(v>b[k])b[k]=v}
+  W=b[0]-a[0]+1;H=b[1]-a[1]+1;L=b[2]-a[2]+1;
+  if(W*H*L>8e7)return say('結構過大（超過 8000 萬格）',1);
+  const g=new Int32Array(W*H*L).fill(-1);
+  for(let i=0;i<B.length;i+=4)g[((B[i+1]-a[1])*L+B[i+2]-a[2])*W+B[i]-a[0]]=B[i+3];
+  const nm=[],ni=new Map(),NI=[],rg=u=>{let j=ni.get(u);if(j==null){j=nm.length;nm.push(u);ni.set(u,j)}return j},
+  PX=pal.map((s,p)=>{const m=s.match(/^([^\[]+)(?:\[(.*)\])?$/),n=m[1],st=m[2]||'',pt=/banner$/.test(n)&&st.match(/pat=([^,]*)/),
+    t=n+(/_bed$/.test(n)&&/part=head/.test(st)?'_head':/_frame$/.test(n)&&/item=/.test(st)?'_'+st.split('item=')[1].split(',')[0]:'')+(pt?'_'+(hs(pt[1])>>>0).toString(36):'');
+    if(pt){BP[t]={n,k:pt[1],w:/wall/.test(n),h:0};BP[t+'_c1']={...BP[t],h:1}}
+    NI[p]=rg(t);const bs=bx(n,m[2]);
+    for(const b of bs||[])if(b[6]){b[6]=Array.isArray(b[6])?b[6].map(x=>rg(t+x)):rg((pt&&b[6]=='_pole'?n:t)+b[6]);if(b[7])b[7]=rg(n)}return bs}),
+  oc=pal.map((s,p)=>!PX[p]&&!/glass|leaves|^ice$|^water$|^lava$/.test(nm[NI[p]]));
+  N=nm;C=nm.map(n=>{const c=col(n);return[(c>>16)/255,(c>>8&255)/255,(c&255)/255]});F=[];E=[];cnt=0;cb=nm.map(()=>0);
+  for(let y=0;y<H;y++)for(let z=0;z<L;z++)for(let x=0;x<W;x++){const p=g[(y*L+z)*W+x];if(p<0)continue;cnt++;cb[NI[p]]++;
+    for(let d=0;d<6;d++){const v=D[d],nx=x+v[0],ny=y+v[1],nz=z+v[2],q=nx<0||ny<0||nz<0||nx>=W||ny>=H||nz>=L?-1:g[(ny*L+nz)*W+nx];
+      if(!PX[p]){if(q<0||!oc[q]&&(PX[q]||NI[q]!=NI[p]))F.push(x,y,z,d,NI[p])}
+      else for(const b of PX[p]){const a=d>>1,e=d&1?b[a]==0:b[a+3]==16;if(e&&q>=0&&oc[q])continue;const tt=b[6]??NI[p],k0=Math.floor(b[1]/16),cl=Array.isArray(tt),ta=b[3]-b[0]==1?0:2;for(let k=k0;k*16<b[4];k++){const y0=Math.max(b[1],k*16),y1=Math.min(b[4],k*16+16);if(d==2&&y1<b[4]||d==3&&y0>b[1])continue;E.push(x+b[0]/16,y+y0/16,z+b[2]/16,x+b[3]/16,y+y1/16,z+b[5]/16,d,cl?a==ta?tt[k-k0]:b[7]:tt)}}}}
+  PX.forEach((x,p)=>x&&x.forEach(b=>{if(b[6]!=null&&cb[NI[p]])for(const j of[b[6],b[7]].flat())if(j!=null)cb[j]=Math.max(cb[j],cb[NI[p]])}));if(PK)await ap();show();mj()}
+
+// ---------- 3D 預覽 ----------
+let rd,scn,cmr,tg,mesh,gr,R=20,th=.8,ph=1.1;const cv=$('#cv');
+try{rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});scn=new THREE.Scene();cmr=new THREE.PerspectiveCamera(45,1,.1,1e4);tg=new THREE.Vector3();rd.setPixelRatio(Math.min(devicePixelRatio,2))}catch(e){rd=null;say('此裝置無法顯示 3D 預覽，仍可匯出模型',1)}
+function cam(){if(!rd)return;R=Math.min(Math.max(R,2),4000);cmr.position.set(tg.x+R*Math.sin(ph)*Math.sin(th),tg.y+R*Math.cos(ph),tg.z+R*Math.sin(ph)*Math.cos(th));cmr.lookAt(tg);rd.render(scn,cmr)}
+function show(){
+  const nf=F.length/5+E.length/8;
+  $('#info').textContent=`尺寸 ${W}×${H}×${L}　方塊 ${cnt}　面 ${nf}　三角形 ${nf*2}`;
+  $('#bO').disabled=$('#bT').disabled=false;$('#hint').style.display='none';say('');tl();
+  if(!rd)return;
+  const A=atlas();AC=A.cols;const pos=new Float32Array(nf*18),cl=new Uint8Array(nf*18),uv=new Float32Array(nf*12);let o=0,u=0;
+  for(let i=0;i<F.length;i+=5){const x=F[i],y=F[i+1],z=F[i+2],dd=F[i+3],v=D[dd],c=v[3],s=v[4]*255,t=F[i+4]*3+(dd==2?0:dd==3?2:1),tc=t%AC,tr=t/AC|0;
+    for(const j of Q){pos[o]=x+c[j*3];pos[o+1]=y+c[j*3+1];pos[o+2]=z+c[j*3+2];cl[o]=cl[o+1]=cl[o+2]=s;o+=3;const[lu,lv]=uvf(dd,c[j*3],c[j*3+1],c[j*3+2]);uv[u++]=(tc+.03+lu*.94)/AC;uv[u++]=1-(tr+.03+(1-lv)*.94)/AC}}
+  for(let i=0;i<E.length;i+=8){const dd=E[i+6],c=D[dd][3],s=D[dd][4]*255,t=E[i+7]*3+(dd==2?0:dd==3?2:1),tc=t%AC,tr=t/AC|0,ox=Math.floor(E[i]),oy=Math.floor(E[i+1]),oz=Math.floor(E[i+2]);
+    for(const j of Q){const X=c[j*3]?E[i+3]:E[i],Y=c[j*3+1]?E[i+4]:E[i+1],Z=c[j*3+2]?E[i+5]:E[i+2];pos[o]=X;pos[o+1]=Y;pos[o+2]=Z;cl[o]=cl[o+1]=cl[o+2]=s;o+=3;const[lu,lv]=uvf(dd,X-ox,Y-oy,Z-oz);uv[u++]=(tc+.03+lu*.94)/AC;uv[u++]=1-(tr+.03+(1-lv)*.94)/AC}}
+  if(mesh){scn.remove(mesh);mesh.geometry.dispose()}if(gr)scn.remove(gr);
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(cl,3,true));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  mesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,map:mkT(A.c),alphaTest:.3}));scn.add(mesh);
+  const n=Math.ceil((Math.max(W,L)+6)/2)*2;gr=new THREE.GridHelper(n,n,0x888888,0x666666);gr.position.set(Math.round(W/2),-.01,Math.round(L/2));scn.add(gr);
+  tg.set(W/2,H/2,L/2);R=Math.max(W,H,L)*1.7+4;cam()}
+function rs(){if(!rd)return;const r=$('#stage').getBoundingClientRect();rd.setSize(r.width,r.height,false);cmr.aspect=r.width/r.height;cmr.updateProjectionMatrix();cam()}
+new ResizeObserver(rs).observe($('#stage'));
+const P=new Map();
+cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY])};
+cv.onpointermove=e=>{const o=P.get(e.pointerId);if(!o)return;const n=[e.clientX,e.clientY];
+  if(P.size==1){th-=(n[0]-o[0])*.01;ph=Math.min(3.09,Math.max(.05,ph-(n[1]-o[1])*.01))}
+  else if(P.size==2){const q=[...P].find(([k])=>k!=e.pointerId)[1];R*=Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(n[0]-q[0],n[1]-q[1])}
+  P.set(e.pointerId,n);cam()};
+cv.onpointerup=cv.onpointercancel=e=>P.delete(e.pointerId);
+cv.onwheel=e=>{e.preventDefault();R*=Math.exp(e.deltaY*.001);cam()};
+
+// ---------- 材質 ----------
+const hs=s=>{let h=7;for(const c of s)h=Math.imul(h,31)+c.charCodeAt(0)|0;return h},
+rn=(h,x,y,k=0)=>{let t=Math.imul(h^k*977,2654435761)^Math.imul(x*31+y*17+1,2246822519);t=Math.imul(t^t>>>15,2246822519);return((t^t>>>13)>>>0)/4294967296},
+sc=(k,f)=>((k>>16)*f&255)<<16|((k>>8&255)*f&255)<<8|(k&255)*f&255,
+GB=/^(grass_block|podzol|mycelium)$/,LG=/_(log|stem)$/,BD=/_bed(_head)?$/,sp=n=>GB.test(n)||LG.test(n)||BD.test(n),
+uvf=(d,x,y,z)=>d<2?[d?z:1-z,y]:d>3?[d==4?x:1-x,y]:[x,d==2?1-z:z],
+U={},G={},MT={},SL=['頂','側','底'],us=()=>N.map((_,p)=>p).filter(p=>cb[p]),
+tex=(n,s)=>{s=sp(n)?s:1;return U[n]?.[s]||MT[n+s]||(G[n+s]??=gen(n,s))},
+png=c=>new Promise(r=>c.toBlob(async b=>r(new Uint8Array(await b.arrayBuffer())),'image/png'));
+// 程式產生的 16×16 MC 風格貼圖（非 Mojang 原圖）；s：0 頂／1 側／2 底
+function gen(n,s){
+  if(BP[n])return ban(BP[n]);
+  n=n.replace(/^(\w+?)_(stairs|slab|fence)$/,(m,w)=>/oak|spruce|birch|jungle|acacia|mangrove|cherry|bamboo|crimson|warped/.test(w)?w+'_planks':m);
+  const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d'),im=x.createImageData(16,16),d=im.data,h=hs(n),b=col(n);
+  for(let y=0;y<16;y++)for(let X=0;X<16;X++){
+    let k=b,m=.85+.3*rn(h,X,y),a=255;
+    if(GB.test(n)&&(s==2||s==1&&y>2+(rn(h,X,0,5)>.5)))k=0x866043;
+    else if(LG.test(n)){const r=Math.max(Math.abs(X-7.5),Math.abs(y-7.5));
+      if(s==1){k=sc(b,.6);if(X%4==1)m*=.75}else if(r>6.5)k=sc(b,.6);else if((r|0)%3==2)m*=.8}
+    else if(BD.test(n)){if(s==0)k=/_head$/.test(n)&&X>1&&X<14&&y>1&&y<14?0xe8e8e8:b;else if(s==2||y>12)k=0x8a6a3c}
+    else if(/torch$/.test(n)){const f=/wall/.test(n)?y>1&&y<4:y>5&&y<9;k=f?/soul/.test(n)?0x3fd2e0:/redstone/.test(n)?0xe02515:0xffc830:0x8a6a3c}
+    else if(/_pole$/.test(n))k=0x8a6a3c
+    else if(/_door$/.test(n)){if(X<2||X>13||y<2||y>13)k=sc(b,.7)}
+    else if(/item_frame/.test(n)){const it=n.replace(/^(glow_)?item_frame_?/,'');k=it&&X>3&&X<12&&y>3&&y<12?col(it):0x9a6c3c}
+    else if(n.endsWith('planks')){if(y%4==3)m*=.75;if(X==((y>>2)%2?4:11))m*=.8}
+    else if(/brick/.test(n)){if(y%4==3||(X+(y>>2)%2*4)%8==7)k=sc(b,.65)}
+    else if(/_ore$/.test(n)){k=n.includes('deepslate')?0x4a4a50:0x7d7d7d;if(rn(h,X>>1,y>>1,3)<.22)k=b}
+    else if(n.includes('glass'))a=X%15==0||y%15==0?255:(X+y)%8==2&&X>2&&X<12?150:50;
+    else if(n.includes('leaves')){if(rn(h,X,y,7)<.28)a=0;m=.7+.5*rn(h,X,y,2)}
+    else if(/concrete|terracotta|^water$|^lava$/.test(n))m=.95+.1*rn(h,X,y,1);
+    const i=(y*16+X)*4;d[i]=(k>>16)*m;d[i+1]=(k>>8&255)*m;d[i+2]=(k&255)*m;d[i+3]=a}
+  x.putImageData(im,0,0);return c}
+// 旗幟：把圖層依序畫在 48×104 的旗面上，再依旗面在方塊內的位置（上／下兩段）切成 64×64 貼圖
+const bpoly=(...a)=>g=>{g.beginPath();for(let i=0;i<a.length;i+=2)g[i?'lineTo':'moveTo'](a[i],a[i+1]);g.closePath();g.fill()},
+brect=(x,y,w,h)=>g=>g.fillRect(x,y,w,h),bcirc=(x,y,r)=>g=>{g.beginPath();g.arc(x,y,r,0,7);g.fill()},
+bcut=f=>g=>{g.globalCompositeOperation='destination-out';f(g);g.globalCompositeOperation='source-over'},
+BPD={
+ stripe_bottom:brect(0,33,20,7),stripe_top:brect(0,0,20,7),stripe_left:brect(0,0,6,40),stripe_right:brect(14,0,6,40),stripe_center:brect(7,0,6,40),stripe_middle:brect(0,17,20,7),
+ stripe_downright:bpoly(0,0,3,0,20,34,20,40,17,40,0,6),stripe_downleft:bpoly(20,0,17,0,0,34,0,40,3,40,20,6),
+ small_stripes:g=>{for(let i=0;i<4;i++)g.fillRect(1.5+i*5,0,2.5,26)},
+ cross:g=>{BPD.stripe_downright(g);BPD.stripe_downleft(g)},straight_cross:g=>{BPD.stripe_center(g);BPD.stripe_middle(g)},
+ square_bottom_left:brect(0,32,8,8),square_bottom_right:brect(12,32,8,8),square_top_left:brect(0,0,8,8),square_top_right:brect(12,0,8,8),
+ triangle_bottom:bpoly(0,40,10,20,20,40,20,32,10,12,0,32),triangle_top:bpoly(0,0,10,20,20,0,20,8,10,28,0,8),
+ triangles_bottom:bpoly(0,40,0,28,10,34,20,28,20,40),triangles_top:bpoly(0,0,0,12,10,6,20,12,20,0),
+ diagonal_left:bpoly(0,0,20,0,0,40),diagonal_right:bpoly(0,0,20,0,20,40),diagonal_up_left:bpoly(0,0,0,40,20,40),diagonal_up_right:bpoly(20,0,20,40,0,40),
+ circle:bcirc(10,20,5),rhombus:bpoly(10,11,17,20,10,29,3,20),
+ half_vertical:brect(0,0,10,40),half_vertical_right:brect(10,0,10,40),half_horizontal:brect(0,0,20,20),half_horizontal_bottom:brect(0,20,20,20),
+ border:g=>{g.fillRect(0,0,20,3);g.fillRect(0,37,20,3);g.fillRect(0,0,3,40);g.fillRect(17,0,3,40)},
+ curly_border:g=>{BPD.border(g);const t=(...a)=>bpoly(...a)(g);for(let i=0;i<4;i++){const x=3+i*3.5;t(x,3,x+3.5,3,x+1.75,5.5);t(x,37,x+3.5,37,x+1.75,34.5)}
+   for(let i=0;i<9;i++){const y=3+i*34/9;t(3,y,3,y+34/9,5.5,y+17/9);t(17,y,17,y+34/9,14.5,y+17/9)}},
+ gradient:(g,c)=>{const l=g.createLinearGradient(0,0,0,40);l.addColorStop(0,c);l.addColorStop(1,c+'00');g.fillStyle=l;g.fillRect(0,0,20,40)},
+ gradient_up:(g,c)=>{const l=g.createLinearGradient(0,40,0,0);l.addColorStop(0,c);l.addColorStop(1,c+'00');g.fillStyle=l;g.fillRect(0,0,20,40)},
+ bricks:g=>{for(let r=0;r<8;r++){const y=r*5;if(r)g.fillRect(0,y-.5,20,1);for(const x of r%2?[5,15]:[10])g.fillRect(x-.5,y,1,5)}},
+ globe:g=>{g.lineWidth=1.4;g.beginPath();g.arc(10,20,6.5,0,7);g.stroke();g.beginPath();g.ellipse(10,20,3,6.5,0,0,7);g.stroke();g.fillRect(3.5,19.4,13,1.2)},
+ creeper:g=>{g.fillRect(5,15,4,4);g.fillRect(11,15,4,4);g.fillRect(8,19,4,4);g.fillRect(6,22,3,5);g.fillRect(11,22,3,5)},
+ skull:g=>{g.beginPath();g.ellipse(10,17,6,6,0,0,7);g.fill();g.fillRect(6.5,20,7,7);bcut(h=>{h.fillRect(6,15,3,3);h.fillRect(11,15,3,3);h.fillRect(9,19.5,2,2.5);h.fillRect(8,25,.8,2);h.fillRect(11.2,25,.8,2)})(g)},
+ flower:g=>{for(let i=0;i<6;i++){const a=i*Math.PI/3;g.beginPath();g.arc(10+Math.cos(a)*4,20+Math.sin(a)*4,2.8,0,7);g.fill()}bcut(bcirc(10,20,1.6))(g)},
+ mojang:g=>{g.lineWidth=3;g.beginPath();g.arc(10,20,6,.5,5.8);g.stroke();g.fillRect(9,18,2,6);g.fillRect(12.5,21.5,3,3)},
+ piglin:g=>{g.beginPath();g.roundRect(4,15,12,8,2);g.fill();bcut(h=>{h.fillRect(7,17,2,3.5);h.fillRect(11,17,2,3.5)})(g)},
+ flow:g=>{g.lineWidth=2;g.lineCap='round';g.beginPath();for(let a=0;a<15;a+=.2){const r=.7+a*.55;g[a?'lineTo':'moveTo'](10+Math.cos(a)*r,20+Math.sin(a)*r)}g.stroke()},
+ guster:g=>{g.lineWidth=2;g.lineCap='round';for(const[r,a0,a1]of[[3,.3,5.2],[6,1.2,6.2],[9,2.2,7.2]]){g.beginPath();g.arc(10,20,r,a0,a1);g.stroke()}}
+};
+function ban(o){
+  const dye=k=>'#'+(DY.find(d=>d[0]==k)?.[1]??0).toString(16).padStart(6,'0'),cw=48,ch=104,cl=document.createElement('canvas');cl.width=cw;cl.height=ch;
+  const cx=cl.getContext('2d');cx.fillStyle=dye(o.n.replace(/(wall_)?banner$/,'').replace(/_$/,''));cx.fillRect(0,0,cw,ch);
+  for(const e of o.k.split('~')){const[pn,cn]=e.split('.'),f=BPD[pn];if(!f)continue;
+    const ly=document.createElement('canvas');ly.width=cw;ly.height=ch;const g=ly.getContext('2d');g.scale(cw/20,ch/40);g.fillStyle=g.strokeStyle=dye(cn);f(g,dye(cn));cx.drawImage(ly,0,0)}
+  const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.fillStyle=dye(o.n.replace(/(wall_)?banner$/,'').replace(/_$/,''));x.fillRect(0,0,64,64);
+  // 貼圖取樣含 3% 邊界，旗面對應 x 2~14／y 依上下兩段偏移（直立旗頂端 28、壁掛旗 29，每段 16）
+  const top=(o.w?29:28)-16*o.h;x.drawImage(cl,1.92+3.76*2,62.08-3.76*top,3.76*12,3.76*26);return c}
+function mkT(c){const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.LinearFilter;t.generateMipmaps=false;return t}
+function atlas(){const cols=Math.ceil(Math.sqrt(N.length*3)),ids=us();let T=16;
+  for(const p of ids)for(let s=0;s<3;s++)T=Math.max(T,tex(N[p],s).width);
+  T=Math.min(T,4096/cols|0);const c=document.createElement('canvas');c.width=c.height=cols*T;const x=c.getContext('2d');x.imageSmoothingEnabled=false;
+  for(const p of ids)for(let s=0;s<3;s++){const i=p*3+s;x.drawImage(tex(N[p],s),i%cols*T,(i/cols|0)*T,T,T)}
+  return{c,cols}}
+function refresh(){tl();if(!rd||!mesh)return;const a=atlas();mesh.material.map.dispose();mesh.material.map=mkT(a.c);mesh.material.needsUpdate=true;cam()}
+// ---------- 方塊中文名稱（常見譯名；對不到的方塊只顯示 ID）----------
+const ZC={white:'白色',orange:'橙色',magenta:'洋紅色',light_blue:'淺藍色',yellow:'黃色',lime:'黃綠色',pink:'粉紅色',gray:'灰色',light_gray:'淺灰色',cyan:'青色',purple:'紫色',blue:'藍色',brown:'棕色',green:'綠色',red:'紅色',black:'黑色'},
+ZK={wool:'羊毛',carpet:'地毯',concrete:'混凝土',concrete_powder:'混凝土粉末',terracotta:'陶瓦',glazed_terracotta:'釉面陶瓦',stained_glass:'染色玻璃',stained_glass_pane:'染色玻璃片',bed:'的床',banner:'旗幟',wall_banner:'壁掛旗幟',shulker_box:'界伏盒',candle:'蠟燭'},
+ZW={oak:'橡木',spruce:'杉木',birch:'白樺木',jungle:'叢林木',acacia:'相思木',dark_oak:'黑橡木',pale_oak:'蒼白橡木',mangrove:'紅樹木',cherry:'櫻花木',bamboo:'竹',crimson:'緋紅',warped:'扭曲'},
+ZP={planks:'木板',log:'原木',wood:'木頭',stairs:'階梯',slab:'半磚',fence:'柵欄',fence_gate:'柵欄門',door:'門',trapdoor:'活板門',pressure_plate:'壓力板',button:'按鈕',sign:'告示牌',wall_sign:'牆上告示牌',hanging_sign:'懸掛式告示牌',leaves:'樹葉',sapling:'樹苗',stem:'菌柄',hyphae:'菌核'},
+ZS={stairs:'階梯',slab:'半磚',wall:'牆',fence:'柵欄'},
+ZQ={polished:'磨製',chiseled:'鑿製',cracked:'裂紋',mossy:'苔癬',smooth:'平滑',cut:'切製',exposed:'斑駁的',weathered:'風化的',oxidized:'氧化的',waxed:'上蠟的',stripped:'去皮'},
+ZO={coal:'煤炭',iron:'鐵',gold:'金',diamond:'鑽石',emerald:'綠寶石',lapis:'青金石',redstone:'紅石',copper:'銅',nether_gold:'地獄金',nether_quartz:'地獄石英'},
+ZE=Object.fromEntries(('stone:石頭 granite:花崗岩 diorite:閃長岩 andesite:安山岩 deepslate:深板岩 cobbled_deepslate:鵝卵深板岩 calcite:方解石 tuff:凝灰岩 dripstone_block:滴水石塊 basalt:玄武岩 blackstone:黑石 polished_blackstone_bricks:磨製黑石磚 '+
+'grass_block:草方塊 dirt:泥土 coarse_dirt:粗泥土 podzol:灰化土 mycelium:菌絲土 mud:泥巴 mud_bricks:泥磚 packed_mud:壓實的泥巴 dirt_path:土徑 farmland:耕地 cobblestone:鵝卵石 bedrock:基岩 sand:沙子 red_sand:紅沙 gravel:礫石 clay:黏土 sandstone:砂岩 red_sandstone:紅砂岩 '+
+'stone_bricks:石磚 bricks:紅磚 nether_bricks:地獄磚 red_nether_bricks:紅色地獄磚 end_stone_bricks:終界石磚 deepslate_bricks:深板岩磚 deepslate_tiles:深板岩瓷磚 prismarine:海磷石 prismarine_bricks:海磷石磚 dark_prismarine:暗海磷石 sea_lantern:海燈籠 '+
+'quartz_block:石英方塊 quartz_bricks:石英磚 quartz_pillar:石英柱 purpur_block:紫珀方塊 purpur_pillar:紫珀柱 netherrack:地獄岩 soul_sand:靈魂沙 soul_soil:靈魂土 magma_block:岩漿方塊 glowstone:螢石 obsidian:黑曜石 crying_obsidian:哭泣的黑曜石 end_stone:終界石 '+
+'terracotta:陶瓦 glass:玻璃 glass_pane:玻璃片 tinted_glass:遮光玻璃 ice:冰 packed_ice:緊密冰 blue_ice:藍冰 snow:雪 snow_block:雪方塊 powder_snow:粉雪 water:水 lava:熔岩 '+
+'iron_block:鐵方塊 gold_block:金方塊 diamond_block:鑽石方塊 emerald_block:綠寶石方塊 lapis_block:青金石方塊 redstone_block:紅石方塊 coal_block:煤炭方塊 copper_block:銅方塊 netherite_block:獄髓方塊 amethyst_block:紫水晶方塊 iron_bars:鐵柵欄 chain:鎖鏈 iron_door:鐵門 iron_trapdoor:鐵活板門 '+
+'bookshelf:書櫃 chiseled_bookshelf:浮雕書櫃 crafting_table:工作台 furnace:熔爐 blast_furnace:高爐 smoker:煙燻爐 chest:箱子 trapped_chest:陷阱箱 ender_chest:終界箱 barrel:木桶 anvil:鐵砧 enchanting_table:附魔台 brewing_stand:釀造台 cauldron:鍋釜 grindstone:砂輪 stonecutter:切石機 loom:織布機 cartography_table:製圖台 fletching_table:製箭台 smithing_table:鍛造台 lectern:講台 composter:堆肥桶 bell:鐘 beacon:烽火台 '+
+'torch:火把 wall_torch:牆上的火把 soul_torch:靈魂火把 soul_wall_torch:牆上的靈魂火把 redstone_torch:紅石火把 redstone_wall_torch:牆上的紅石火把 lantern:燈籠 soul_lantern:靈魂燈籠 campfire:營火 redstone_lamp:紅石燈 jack_o_lantern:南瓜燈 pumpkin:南瓜 melon:西瓜 hay_block:乾草捆 ladder:梯子 scaffolding:鷹架 '+
+'tnt:炸藥 cobweb:蜘蛛網 sugar_cane:甘蔗 cactus:仙人掌 lily_pad:睡蓮葉 vine:藤蔓 grass:草 short_grass:草 tall_grass:高草叢 fern:蕨 large_fern:大型蕨 dead_bush:枯萎的灌木 moss_block:苔蘚方塊 moss_carpet:苔蘚地毯 sponge:海綿 wet_sponge:濕海綿 slime_block:黏液方塊 honey_block:蜂蜜方塊 bone_block:骨塊 shroomlight:蕈光體 item_frame:物品展示框 glow_item_frame:螢光物品展示框 flower_pot:花盆 '+
+'dandelion:蒲公英 poppy:虞美人 blue_orchid:藍色蘭花 allium:紅蔥 azure_bluet:藍花美耳草 red_tulip:紅色鬱金香 orange_tulip:橙色鬱金香 white_tulip:白色鬱金香 pink_tulip:粉紅色鬱金香 oxeye_daisy:雛菊 cornflower:矢車菊 lily_of_the_valley:鈴蘭 sunflower:向日葵 lilac:紫丁香 rose_bush:玫瑰叢 peony:牡丹 azalea:杜鵑花叢 azalea_leaves:杜鵑樹葉 flowering_azalea_leaves:盛開的杜鵑樹葉 '+
+'red_mushroom:紅色蘑菇 brown_mushroom:棕色蘑菇 red_mushroom_block:紅色蘑菇方塊 brown_mushroom_block:棕色蘑菇方塊 mushroom_stem:蘑菇柄 bamboo:竹子 bamboo_block:竹方塊 bamboo_planks:竹板 bamboo_mosaic:竹馬賽克 crimson_nylium:緋紅菌岩 warped_nylium:扭曲菌岩 nether_wart_block:地獄疣方塊 warped_wart_block:扭曲疣方塊 '+
+'diamond:鑽石 emerald:綠寶石 gold_ingot:金錠 iron_ingot:鐵錠 filled_map:地圖 clock:時鐘 compass:指南針 book:書 paper:紙').split(' ').map(s=>s.split(':')));
+function zh(n){
+  if(!n)return'';if(ZE[n])return ZE[n];
+  const g=s=>zh(s)||zh(s+'s')||zh(s+'_block');let m,r;
+  if(m=n.match(/^(.+)_pole$/))return(r=zh(m[1]))&&r+'（旗桿）';
+  if(m=n.match(/^(.+_bed)_head$/))return(r=zh(m[1]))&&r+'（床頭）';
+  if(m=n.match(/^(glow_)?item_frame_(.+)$/))return(m[1]?'螢光':'')+'物品展示框（'+(zh(m[2])||m[2])+'）';
+  if(m=n.match(/^potted_(.+)$/))return(r=g(m[1]))&&'盆栽'+r;
+  if(m=n.match(/^(deepslate_)?(.+)_ore$/))return ZO[m[2]]?(m[1]?'深板岩':'')+ZO[m[2]]+'礦石':'';
+  if(m=n.match(/^(white|orange|magenta|light_blue|yellow|lime|pink|gray|light_gray|cyan|purple|blue|brown|green|red|black)_(.+)$/))if(ZK[m[2]])return ZC[m[1]]+ZK[m[2]];
+  if(m=n.match(/^(dead_)?(tube|brain|bubble|fire|horn)_coral(_block|_fan|_wall_fan)?$/))return(m[1]?'失活的':'')+{tube:'管',brain:'腦',bubble:'泡泡',fire:'火焰',horn:'鹿角'}[m[2]]+'珊瑚'+({_block:'方塊',_fan:'扇',_wall_fan:'扇'}[m[3]]||'');
+  if(m=n.match(/^(oak|spruce|birch|jungle|acacia|dark_oak|pale_oak|mangrove|cherry|bamboo|crimson|warped)_(.+)$/))if(ZP[m[2]])return ZW[m[1]]+ZP[m[2]];
+  if(m=n.match(/^(stripped|polished|chiseled|cracked|mossy|smooth|cut|exposed|weathered|oxidized|waxed)_(.+)$/)){r=g(m[2]);if(r)return ZQ[m[1]]+r}
+  if(m=n.match(/^(.+)_(stairs|slab|wall|fence)$/)){r=g(m[1]);if(r)return r.replace(/方塊$/,'')+ZS[m[2]]}
+  return''}
+// 下方方塊清單
+function tl(){const L2=$('#tl'),ids=us().filter(p=>!BP[N[p]]).sort((a,b)=>cb[b]-cb[a]);L2.textContent='';$('#tt').textContent=`結構內的方塊種類（${ids.length}）`;$('#tp').style.display='block';
+  for(const p of ids){const n=N[p],e=document.createElement('div'),r=document.createElement('div'),i=document.createElement('div');e.className='tc';r.className='th';
+    for(const s of sp(n)?[0,1,2]:[1]){const c=document.createElement('canvas');c.width=c.height=32;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(tex(n,s),0,0,32,32);
+      c.title=(sp(n)?SL[s]+'面：':'')+'點擊上傳圖片替換';c.onclick=()=>{up=[n,s];$('#fu').click()};r.append(c)}
+    {const z=zh(n);i.textContent='';if(z){const b=document.createElement('b');b.textContent=z;i.append(b,document.createElement('br'))}i.append(n+' ×'+cb[p])}
+    if(U[n]){const b=document.createElement('button');b.textContent='↺ 還原';b.onclick=()=>{delete U[n];refresh()};i.append(' ',b)}
+    e.append(r,i);L2.append(e)}}
+const toC=(b,tn)=>{const s=Math.min(b.width,b.height),o=Math.min(s,128),c=document.createElement('canvas');c.width=c.height=o;const x=c.getContext('2d');x.drawImage(b,0,0,s,s,0,0,o,o);
+  if(tn!=null){x.globalCompositeOperation='multiply';x.fillStyle='#'+tn.toString(16).padStart(6,'0');x.fillRect(0,0,o,o);x.globalCompositeOperation='destination-in';x.drawImage(b,0,0,s,s,0,0,o,o)}return c};
+$('#fu').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!up)return;
+  try{(U[up[0]]??=[])[up[1]]=toC(await createImageBitmap(f));say('')}catch(x){return say('無法讀取這張圖片',1)}refresh()};
+// 從使用者自己的材質包 .zip／遊戲 .jar 讀取貼圖（本機處理，不上傳）
+async function ap(){const{u,m}=PK,dv=new DataView(u.buffer,u.byteOffset),get=async k=>{const e=m[k];if(!e)return;const o=e[0],a=o+30+dv.getUint16(o+26,true)+dv.getUint16(o+28,true),d=u.subarray(a,a+e[2]);
+    return createImageBitmap(new Blob([e[1]?pako.inflateRaw(d):d],{type:'image/png'}))};
+  for(const p of us()){const n=N[p],b=n.replace(/_(stairs|slab|wall|fence_gate|fence|button|pressure_plate|trapdoor|door)$/,''),
+    fl=GB.test(n)?[[n+'_top'],[n+'_side'],['dirt']]:LG.test(n)?[[n+'_top'],[n],[n+'_top']]:null;
+    for(const s of sp(n)?[0,1,2]:[1]){for(const k of fl?fl[s]:[b,b+'s',b.replace('carpet','wool'),b+'_planks',b+'_still',b+'_side',b+'_top',b+'_block',n+'_bottom',b.replace('wall_','')]){
+      let im;try{im=await get(k)}catch(x){}
+      if(im){(U[n]??=[])[s]=toC(im,/leaves$|^water$/.test(n)||n=='grass_block'&&s==0?col(n):null);break}}}}}
+$('#fz').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{say('讀取材質包…');const u=new Uint8Array(await f.arrayBuffer()),dv=new DataView(u.buffer);let q=u.length-22;
+    while(q>=0&&dv.getUint32(q,true)!=0x06054b50)q--;if(q<0)throw Error('不是 ZIP／jar');
+    let n=dv.getUint16(q+10,true),p=dv.getUint32(q+16,true);const m={},td=new TextDecoder();
+    for(;n--;){const nl=dv.getUint16(p+28,true),mm=td.decode(u.subarray(p+46,p+46+nl)).match(/textures\/blocks?\/([^/]+)\.png$/);
+      if(mm)m[mm[1]]=[dv.getUint32(p+42,true),dv.getUint16(p+10,true),dv.getUint32(p+20,true)];p+=46+nl+dv.getUint16(p+30,true)+dv.getUint16(p+32,true)}
+    if(!Object.keys(m).length)throw Error('找不到方塊貼圖');PK={u,m};if(N.length){await ap();refresh()}say('已套用材質包。匯出時會附上這些貼圖，請確認你有權分享。')}
+  catch(x){say('材質包讀取失敗：'+x.message,1)}};
+$('#bR').onclick=()=>{for(const k in U)delete U[k];PK=null;if(N.length)refresh()};
+
+// ---------- Mojang 官方 GitHub 材質（Mojang/bedrock-samples，基岩版原版材質包）----------
+// Java 方塊名稱 → 基岩版貼圖檔名（resource_pack/textures/blocks/*.png）；對不到的方塊沿用程式產生的貼圖
+const MJ='https://raw.githubusercontent.com/Mojang/bedrock-samples/main/resource_pack/textures/blocks/',RC=new Map(),
+BA={stone_bricks:'stonebrick',mossy_stone_bricks:'stonebrick_mossy',cracked_stone_bricks:'stonebrick_cracked',chiseled_stone_bricks:'stonebrick_carved',mossy_cobblestone:'cobblestone_mossy',granite:'stone_granite',polished_granite:'stone_granite_smooth',diorite:'stone_diorite',polished_diorite:'stone_diorite_smooth',andesite:'stone_andesite',polished_andesite:'stone_andesite_smooth',smooth_stone:'stone_slab_top',bricks:'brick',nether_bricks:'nether_brick',red_nether_bricks:'red_nether_brick',end_stone_bricks:'end_bricks',terracotta:'hardened_clay',snow_block:'snow',water:'water_still',lava:'lava_still',grass_block_top:'grass_top',grass_block_side:'grass_side_carried',podzol_top:'dirt_podzol_top',podzol_side:'dirt_podzol_side',sandstone:'sandstone_normal',red_sandstone:'red_sandstone_normal',chiseled_sandstone:'sandstone_carved',cut_sandstone:'sandstone_smooth',smooth_sandstone:'sandstone_top',quartz_block:'quartz_block_side',quartz_pillar:'quartz_block_lines',chiseled_quartz_block:'quartz_block_chiseled',smooth_quartz:'quartz_block_bottom',prismarine:'prismarine_rough',dark_prismarine:'prismarine_dark',hay_block:'hay_block_side',tnt:'tnt_side',pumpkin:'pumpkin_side',melon:'melon_side',crafting_table:'crafting_table_side',furnace:'furnace_side',bone_block:'bone_block_side',magma_block:'magma',slime_block:'slime',torch:'torch_on',wall_torch:'torch_on',redstone_torch:'redstone_torch_on',redstone_wall_torch:'redstone_torch_on',redstone_lamp:'redstone_lamp_off'},
+BM={wool:'wool_colored_',concrete:'concrete_',concrete_powder:'concrete_powder_',terracotta:'hardened_clay_stained_',glazed_terracotta:'glazed_terracotta_',stained_glass:'glass_',stained_glass_pane:'glass_'},
+RW=/^(?:(stripped)_)?(oak|spruce|birch|jungle|acacia|dark_oak)_(planks|log|wood|leaves)(_top)?$/,
+RB=new RegExp('^('+DY.map(d=>d[0]).join('|')+')_(wool|concrete_powder|concrete|glazed_terracotta|terracotta|stained_glass_pane|stained_glass)$'),
+bk=k=>{const o=[];let m;
+  if(BA[k])o.push(BA[k]);
+  else if(m=k.match(RW)){const t=m[2]=='dark_oak'?'big_oak':m[2];o.push(m[3]=='planks'?'planks_'+t:m[3]=='leaves'?'leaves_'+t:m[1]?'stripped_'+m[2]+'_log'+(m[4]||''):'log_'+t+(m[3]=='log'&&m[4]||''))}
+  else if(m=k.match(RB))o.push(BM[m[2]]+(m[1]=='light_gray'?'silver':m[1]));
+  o.push(k);if(/deepslate/.test(k))o.push('deepslate/'+k);return o},
+ck=(n,s)=>{const b=n.replace(/_(stairs|slab|wall|fence_gate|fence|button|pressure_plate|trapdoor|door)$/,'');
+  return GB.test(n)?[[n+'_top'],[n+'_side'],['dirt']][s]:LG.test(n)?[[n+'_top'],[n],[n+'_top']][s]:[b,b+'s',b.replace('carpet','wool'),b+'_planks',b+'_still',b+'_side',b+'_top',b+'_block',b.replace('wall_','')]},
+TN=(n,s)=>/leaves$|^water$/.test(n)||n=='grass_block'&&s==0?col(n):null,
+mg=k=>{let p=RC.get(k);if(!p){p=fetch(MJ+k+'.png').then(r=>r.ok?r.blob().then(b=>createImageBitmap(b)):null).catch(()=>null);RC.set(k,p)}return p};
+async function mj(){
+  const my=N,ids=us().filter(p=>!BP[N[p]]&&!BD.test(N[p]));if(!ids.length)return;
+  try{if(!(await fetch(MJ+'dirt.png')).ok)throw 0}catch(e){return say('無法連線到 Mojang 官方 GitHub，已改用程式產生的貼圖',1)}
+  say('從 Mojang 官方 GitHub 載入貼圖…');let hit=0;
+  try{await Promise.all(ids.flatMap(p=>{const n=N[p];return(sp(n)?[0,1,2]:[1]).map(async s=>{
+    if(U[n]?.[s]||MT[n+s])return;
+    for(const k of ck(n,s))for(const c of bk(k)){const im=await mg(c);if(im){MT[n+s]=toC(im,TN(n,s));hit++;return}}})}))}catch(e){}
+  if(N===my){say(hit?'已載入 '+hit+' 張 Mojang 官方貼圖（找不到的方塊使用內建貼圖）':'');refresh()}}
+
+// ---------- 非完整方塊（半磚／階梯／柵欄／牆／玻璃片／地毯／雪）----------
+// 方塊盒子以 1/16 為單位 [x0,y0,z0,x1,y1,z1]；null＝完整方塊
+const DIRS=['north','east','south','west'],R1=b=>[16-b[5],b[1],b[0],16-b[2],b[4],b[3]],RK=(b,k)=>{while(k-->0)b=R1(b);return b},
+PT=/_(slab|stairs|fence|wall|pane|carpet|bed|door|torch|banner|frame)$|^(iron_bars|snow|torch)$/;
+function bx(n,s){const p=Object.fromEntries((s||'').split(',').map(e=>e.split('='))),
+  cn=DIRS.map((d,k)=>[d,k]).filter(([d])=>/^(true|low|tall)$/.test(p[d])),arms=f=>cn.map(([d,k])=>RK(f(d),k));
+  if(/_torch$|^torch$/.test(n))return /wall/.test(n)?[[7,3,14,9,9,16],[7,8,12,9,14,14]].map(b=>RK(b,Math.max(0,DIRS.indexOf(p.facing)))):[[7,0,7,9,10,9]];
+  if(/_bed$/.test(n)){const k=Math.max(0,DIRS.indexOf(p.facing));return[[0,3,0,16,9,16],...p.part=='head'?[[0,0,0,3,3,3],[13,0,0,16,3,3]]:[[0,0,13,3,3,16],[13,0,13,16,3,16]]].map(b=>RK(b,k))}
+  if(/_door$/.test(n))return[RK(p.open=='true'?p.hinge=='right'?[13,0,0,16,16,16]:[0,0,0,3,16,16]:[0,0,13,16,16,16],Math.max(0,DIRS.indexOf(p.facing)))];
+  if(/banner$/.test(n)){const w=/wall/.test(n),k=w?Math.max(0,DIRS.indexOf(p.facing)):(Math.round((+p.rotation||0)/4)+2)%4;return(w?[[2,-13,15,14,13,16],[1,13,14,15,15,16,1]]:[[2,2,6,14,28,7],[7,0,7,9,30,9,1],[1,28,6,15,30,8,1]]).map(b=>b.length>6?[...RK(b.slice(0,6),k),'_pole']:p.pat?[...RK(b,k),['','_c1'],1]:RK(b,k))}
+  if(/item_frame$/.test(n)){const f=p.facing;return[f=='up'?[2,0,2,14,1,14]:f=='down'?[2,15,2,14,16,14]:RK([2,2,15,14,14,16],Math.max(0,DIRS.indexOf(f)))]}
+  if(/_slab$/.test(n))return p.type=='double'?null:[p.type=='top'?[0,8,0,16,16,16]:[0,0,0,16,8,16]];
+  if(/_stairs$/.test(n)){const t=p.half=='top',k=Math.max(0,DIRS.indexOf(p.facing)),sh=p.shape||'straight',lf=sh.endsWith('left'),
+    bk=[0,0,0,16,8,8],u=sh.startsWith('outer')?[lf?[0,0,0,8,8,8]:[8,0,0,16,8,8]]:sh.startsWith('inner')?[bk,lf?[0,0,8,8,8,16]:[8,0,8,16,8,16]]:[bk];
+    return[[0,t?8:0,0,16,t?16:8,16],...u.map(b=>[b[0],t?0:8,b[2],b[3],t?8:16,b[5]])].map(b=>RK(b,k))}
+  if(/_fence$/.test(n))return[[6,0,6,10,16,10],...arms(()=>[7,6,0,9,9,6]),...arms(()=>[7,12,0,9,15,6])];
+  if(/_pane$|^iron_bars$/.test(n))return[[7,0,7,9,16,9],...arms(()=>[7,0,0,9,16,7])];
+  if(/_wall$/.test(n))return[...p.up=='false'?[]:[[4,0,4,12,16,12]],...arms(d=>[5,0,0,11,p[d]=='tall'?16:14,8])];
+  if(/_carpet$/.test(n))return[[0,0,0,16,1,16]];
+  if(n=='snow'){const l=+p.layers||1;return l>7?null:[[0,0,0,16,l*2,16]]}
+  return null}
+
+// ---------- 匯出 ----------
+const mn=p=>N[p].replace(/^.*:/,'').replace(/\W/g,'_');
+async function obj(k){
+  const vm=new Map(),vs=[],tm=new Map(),vts=[],by=new Map(),n4=v=>+(v*k).toFixed(4),
+  S=(x,y,z)=>{const q=(x*16*(H*16+1)+y*16)*(L*16+1)+z*16;let i=vm.get(q);if(!i){vs.push('v '+n4(x)+' '+n4(y)+' '+n4(z));i=vs.length;vm.set(q,i)}return i},
+  T2=(u,v)=>{const q=u+' '+v;let i=tm.get(q);if(!i){vts.push('vt '+q);i=vts.length;tm.set(q,i)}return i},
+  add=(d,p,X0,Y0,Z0,X1,Y1,Z1)=>{const c=D[d][3],ox=Math.floor(X0),oy=Math.floor(Y0),oz=Math.floor(Z0),s=sp(N[p])?(d==2?0:d==3?2:1):1,
+    q=[0,1,2,3].map(j=>{const X=c[j*3]?X1:X0,Y=c[j*3+1]?Y1:Y0,Z=c[j*3+2]?Z1:Z0,[lu,lv]=uvf(d,X-ox,Y-oy,Z-oz);return S(X,Y,Z)+'/'+T2(lu,lv)}),key=p*3+s;
+    if(!by.has(key))by.set(key,[]);by.get(key).push('f '+q.join(' '))};
+  for(let i=0;i<F.length;i+=5){const x=F[i],y=F[i+1],z=F[i+2];add(F[i+3],F[i+4],x,y,z,x+1,y+1,z+1)}
+  for(let i=0;i<E.length;i+=8)add(E[i+6],E[i+7],E[i],E[i+1],E[i+2],E[i+3],E[i+4],E[i+5]);
+  let t='mtllib '+base+'.mtl\n'+vts.join('\n')+'\n'+vs.join('\n')+'\n',m='';const ps=[];
+  for(const[key,fs]of by){const p=key/3|0,s=key%3,nm=mn(p)+(sp(N[p])?'_'+['top','side','bottom'][s]:'');
+    t+='g '+nm+'\nusemtl '+nm+'\n'+fs.join('\n')+'\n';m+='newmtl '+nm+'\nKd 1 1 1\nd 1\nmap_Kd textures/'+nm+'.png\nmap_d textures/'+nm+'.png\n\n';
+    ps.push({n:'textures/'+nm+'.png',d:await png(tex(N[p],s))})}
+  return[t,m,ps]}
+function stl(k){ // 轉成 Z 軸向上（3D 列印慣例）
+  const nf=F.length/5+E.length/8,dv=new DataView(new ArrayBuffer(84+nf*100));dv.setUint32(80,nf*2,true);let o=84;
+  const f=v=>{dv.setFloat32(o,v,true);o+=4};
+  const em=(X0,Y0,Z0,X1,Y1,Z1,d)=>{const v=D[d],c=v[3];for(const t of[[0,1,2],[0,2,3]]){f(v[0]);f(-v[2]);f(v[1]);for(const j of t){f((c[j*3]?X1:X0)*k);f((L-(c[j*3+2]?Z1:Z0))*k);f((c[j*3+1]?Y1:Y0)*k)}o+=2}};
+  for(let i=0;i<F.length;i+=5)em(F[i],F[i+1],F[i+2],F[i]+1,F[i+1]+1,F[i+2]+1,F[i+3]);
+  for(let i=0;i<E.length;i+=8)em(E[i],E[i+1],E[i+2],E[i+3],E[i+4],E[i+5],E[i+6]);
+  return new Uint8Array(dv.buffer)}
+function zip(fs){ // 無壓縮 ZIP
+  const te=new TextEncoder(),T=new Uint32Array(256).map((_,n)=>{for(let k=0;k<8;k++)n=n&1?0xEDB88320^(n>>>1):n>>>1;return n}),
+  le=(n,b)=>{const a=[];for(let i=0;i<b;i++)a.push(n>>>(8*i)&255);return a},parts=[],cd=[];let off=0;
+  for(const f of fs){
+    const nm=te.encode(f.n),d=f.d;let c=-1;for(let i=0;i<d.length;i++)c=T[(c^d[i])&255]^(c>>>8);c=(c^-1)>>>0;
+    parts.push(new Uint8Array([...le(0x04034b50,4),...le(20,2),...le(0x800,2),...le(0,2),...le(0,2),...le(0x21,2),...le(c,4),...le(d.length,4),...le(d.length,4),...le(nm.length,2),...le(0,2)]),nm,d);
+    cd.push(...le(0x02014b50,4),...le(20,2),...le(20,2),...le(0x800,2),...le(0,2),...le(0,2),...le(0x21,2),...le(c,4),...le(d.length,4),...le(d.length,4),...le(nm.length,2),...le(0,2),...le(0,2),...le(0,2),...le(0,2),...le(0,4),...le(off,4),...nm);
+    off+=30+nm.length+d.length}
+  const e=[...le(0x06054b50,4),...le(0,2),...le(0,2),...le(fs.length,2),...le(fs.length,2),...le(cd.length,4),...le(off,4),...le(0,2)];
+  return new Blob([...parts,new Uint8Array(cd),new Uint8Array(e)])}
+async function save(name,blob){
+  let dl=null;try{if(window.claude)dl=await claude.use('downloads')}catch(e){}
+  if(dl){try{await dl.save({filename:name,data:blob});say('已儲存 '+name)}catch(e){if(e.code!='declined')say('儲存失敗（'+(e.code||e.message)+'）',1)}}
+  else if(window.claude)say('此環境不支援下載',1);
+  else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1e4)}}
+async function ex(t){
+  if(!F.length)return;const k=parseFloat($('#ks').value)||1;
+  say('產生檔案中…');await new Promise(r=>setTimeout(r,30));
+  try{const te=new TextEncoder();let fs;
+    if(t=='obj'){const[a,m,ps]=await obj(k);fs=[{n:base+'.obj',d:te.encode(a)},{n:base+'.mtl',d:te.encode(m)},...ps]}else fs=[{n:base+'.stl',d:stl(k)}];
+    say('');await save(base+'_'+t+'.zip',zip(fs))}catch(e){say('匯出失敗：'+e.message,1)}}
+
+// ---------- 匯入 ----------
+async function openFile(f){
+  try{say('讀取中…');await new Promise(r=>setTimeout(r,30));
+    let u=new Uint8Array(await f.arrayBuffer());if(u[0]==0x1f&&u[1]==0x8b)u=await gunzip(u);
+    const s=fromNBT(nbt(u,isLE(u)));base=f.name.replace(/\.[^.]*$/,'').replace(/[^\w\u4e00-\u9fff-]+/g,'_')||'model';load(s.pal,s.B)}
+  catch(e){say('無法解析此檔案：'+e.message,1)}}
+$('#fi').onchange=e=>{const f=e.target.files[0];f&&openFile(f)};
+$('#bS').onclick=()=>{const s=sample();base='sample_house';load(s.pal,s.B)};
+$('#bO').onclick=()=>ex('obj');$('#bT').onclick=()=>ex('stl');
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];f&&openFile(f)});
+</script>
+</body>
+</html>
+
+</body></html>
