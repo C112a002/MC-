@@ -58,7 +58,7 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 <li>匯出為 .zip：OBJ 內含 .obj＋.mtl（依方塊上色，可用 Blender／MeshLab 開啟），STL 無顏色，適合 3D 列印。縮放 1 ＝ 每格 1 單位。</li>
 <li>植物（草、花、樹苗、作物、藤蔓等）以十字或田字平面顯示，其他非完整方塊（活板門、柵欄門、梯子、告示牌、花盆、箱子、燈籠…）也會依實際形狀顯示；STL 會把植物平面加厚成薄片。</li>
 <li>旗幟的花紋（結構檔內的 Patterns）會以程式繪製的近似圖樣顯示，並非 Mojang 原圖；匯出 OBJ 時會一併輸出旗面貼圖。</li>
-<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖（依各區塊最上層方塊的顏色繪製的俯視圖，草地綠、水藍、沙黃、雪白…；水越深越暗，玻璃與植物會略過；地獄顯示洞穴地面；區塊多時會邊讀邊畫），拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍每軸上限 999 格（999×999×999），實際能否處理取決於瀏覽器記憶體，過大時會提示縮小；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
+<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖（依各區塊最上層方塊的顏色繪製的俯視圖，草地綠、水藍、沙黃、雪白…；水越深越暗，玻璃與植物會略過；地獄顯示洞穴地面；區塊多時會邊讀邊畫），拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍每軸上限 999 格（999×999×999）；轉換時只記錄「有方塊」的格子位置，空氣不佔記憶體，所以空曠的大範圍也不會配置整個長方體的陣列，實際能否處理取決於範圍內的方塊數量與瀏覽器記憶體，過大時會提示縮小；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
 </footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -146,13 +146,26 @@ function sample(){const pal=['stone_bricks','oak_planks','glass','dark_oak_plank
 function isLE(u){
   const t=le=>{const g=i=>le?u[i]|u[i+1]<<8:u[i]<<8|u[i+1],r=g(1);return r+(u[3+r]?g(4+r):0)};
   return t(1)<t(0)}
+// 稀疏格子：開放定址雜湊表（Int32Array），只替「有方塊的格子」配置記憶體，不需要整個長方體的陣列。
+// 鍵＝格子的線性索引（0 ≤ k < 2^31，範圍每軸上限 999 時必定成立），查不到回傳 -1；沒有 Map 的 1677 萬筆上限
+class SG{
+  constructor(hint){let b=10;while((1<<b)<(hint|0)*2&&b<30)b++;this.b=b;this.k=new Int32Array(1<<b).fill(-1);this.v=new Int32Array(1<<b);this.n=0}
+  get(k){const K=this.k,m=K.length-1;let i=Math.imul(k,-1640531535)>>>(32-this.b);while(K[i]>=0){if(K[i]==k)return this.v[i];i=i+1&m}return-1}
+  set(k,v){if((this.n+1)*2>this.k.length)this.grow();const K=this.k,m=K.length-1;let i=Math.imul(k,-1640531535)>>>(32-this.b);
+    while(K[i]>=0){if(K[i]==k){this.v[i]=v;return}i=i+1&m}K[i]=k;this.v[i]=v;this.n++}
+  grow(){const ok=this.k,ov=this.v;this.b++;const c=1<<this.b,K=this.k=new Int32Array(c).fill(-1),V=this.v=new Int32Array(c),m=c-1;
+    for(let j=0;j<ok.length;j++){const k=ok[j];if(k<0)continue;let i=Math.imul(k,-1640531535)>>>(32-this.b);while(K[i]>=0)i=i+1&m;K[i]=k;V[i]=ov[j]}}
+  each(f){const K=this.k,V=this.v;for(let i=0;i<K.length;i++)if(K[i]>=0)f(K[i],V[i])}}
+// 視為「沒有方塊」的名稱（空氣、結構空位、光源方塊）
+const AIR=/(^|_)air$|structure_void|^light(_block.*)?$/;
 // 轉成 {pal,B}：方塊名稱／狀態轉成 Java 風格；樓梯轉角、柵欄／玻璃片連接、門的樞紐與開關由相鄰方塊推算
+// 傳入 r.cells（SG：線性索引→調色盤編號）時走稀疏模式（.mcworld 用），不需要 structure.block_indices 的整個長方體陣列
 // 索引順序：index=(x*Y+y)*Z+z；第二層（含水）只在第一層為空氣時採用
 function fromBE(r){
-  const[X,Y,Z]=r.size||[],S=r.structure,PD=S.palette&&(S.palette.default||Object.values(S.palette)[0]),Pl=PD&&PD.block_palette,bi=S.block_indices;
-  if(!(X>0&&Y>0&&Z>0)||!Pl||!Array.isArray(bi)||!(bi[0]&&bi[0].length>=0))throw Error('.mcstructure 內容不完整');
-  const l0=bi[0],l1=bi[1]&&bi[1].length?bi[1]:[],np=Pl.length,n0=X*Y*Z;
-  if(l0.length!=n0)throw Error('方塊數量與尺寸不符');
+  const[X,Y,Z]=r.size||[],S=r.structure,PD=S.palette&&(S.palette.default||Object.values(S.palette)[0]),Pl=PD&&PD.block_palette,bi=S.block_indices,SP=r.cells;
+  if(!(X>0&&Y>0&&Z>0)||!Pl||!SP&&(!Array.isArray(bi)||!(bi[0]&&bi[0].length>=0)))throw Error('.mcstructure 內容不完整');
+  const l0=SP?null:bi[0],l1=SP?null:bi[1]&&bi[1].length?bi[1]:[],np=Pl.length,n0=X*Y*Z;
+  if(!SP&&l0.length!=n0)throw Error('方塊數量與尺寸不符');
   const BD4=['east','west','south','north'],BFD=['down','up','north','south','west','east'],BBD=['south','west','north','east'],ND=['north','east','south','west'],
   OPP={east:'west',west:'east',north:'south',south:'north'},CCW={north:'west',west:'south',south:'east',east:'north'},VEC={east:[1,0],west:[-1,0],south:[0,1],north:[0,-1]},
   BAN=DYE.slice().reverse(), // 旗幟的顏色編號與床／羊毛相反：0＝黑 … 15＝白
@@ -220,12 +233,10 @@ function fromBE(r){
     else if(n=='pointed_dripstone'){p.vertical_direction=s.hanging?'down':'up';p.thickness=s.dripstone_thickness=='merge'?'tip_merge':s.dripstone_thickness||'tip'}
     return{n,p,k,d}},
   IP=[],ik=new Map(),reg=e=>{const k=e.n+JSON.stringify(e.p)+JSON.stringify(e.d||0);let i=ik.get(k);if(i==null){i=IP.length;IP.push(e);ik.set(k,i)}return i},
-  b0=Pl.map(q=>reg(bconv(q))),air=b0.map(i=>/(^|_)air$|structure_void|^light(_block.*)?$/.test(IP[i].n)),
-  K=new Int32Array(n0).fill(-1),BE=PD.block_position_data||{},bev=c=>BE[c]&&BE[c].block_entity_data;
+  b0=Pl.map(q=>reg(bconv(q))),air=b0.map(i=>AIR.test(IP[i].n)),
+  K=SP?new SG(SP.n):new Int32Array(n0).fill(-1),kg=SP?c=>K.get(c):c=>K[c],ks=SP?(c,i)=>K.set(c,i):(c,i)=>{K[c]=i},BE=PD.block_position_data||{},bev=c=>BE[c]&&BE[c].block_entity_data;
   // 第一輪：取出每格的方塊；床、旗幟、展示框的顏色／內容來自方塊實體資料
-  for(let x=0,c=0;x<X;x++)for(let y=0;y<Y;y++)for(let z=0;z<Z;z++,c++){
-    let v=l0[c];if(!(v>=0&&v<np)||air[v]){const w=l1[c];v=w>=0&&w<np&&!air[w]?w:-1}
-    if(v<0)continue;
+  const p1=(c,x,y,z,v)=>{
     let i=b0[v];const e=IP[i],d=e.d;
     if(e.k=='bed'){const[dx,dz]=VEC[d.f],o=d.h?-1:1,px=x+o*dx,pz=z+o*dz,g=q=>{const b=bev(q);return b&&typeof b.color=='number'?DYE[b.color&15]:null};
       i=reg({n:(d.c||g(c)||(px>=0&&pz>=0&&px<X&&pz<Z&&g((px*Y+y)*Z+pz))||'red')+'_bed',p:{facing:d.f,part:d.h?'head':'foot'}})}
@@ -234,15 +245,19 @@ function fromBE(r){
       i=reg({n:BAN[(b.Base??15)&15]+(d.w?'_wall_banner':'_banner'),p})}
     else if(e.k=='frame'){const b=bev(c),it=b&&b.Item&&String(b.Item.Name||'').replace(/^minecraft:/,''),p={facing:d.f};if(it)p.item=it;i=reg({n:e.n,p})}
     else if(e.k=='pot'){const b=bev(c),q=b&&(b.PlantBlock||b.plantBlock),pn=q&&q.name&&bconv({name:q.name,states:q.states}).n;i=reg({n:pn&&!/(^|_)air$/.test(pn)?'potted_'+pn:'flower_pot',p:{}})}
-    K[c]=i}
+    ks(c,i)};
+  if(SP)SP.each((c,v)=>{if(v>=0&&v<np&&!air[v]){const z=c%Z,t=(c-z)/Z,y=t%Y;p1(c,(t-y)/Y,y,z,v)}}); // 稀疏：只走訪有方塊的格子
+  else for(let x=0,c=0;x<X;x++)for(let y=0;y<Y;y++)for(let z=0;z<Z;z++,c++){
+    let v=l0[c];if(!(v>=0&&v<np)||air[v]){const w=l1[c];v=w>=0&&w<np&&!air[w]?w:-1}
+    if(v>=0)p1(c,x,y,z,v)}
   // 第二輪：樓梯轉角、柵欄／玻璃片連接、門（依相鄰方塊）→ 最終調色盤
   const pal=[],fx=new Map(),fm=new Map(),B=[],ser=p=>Object.entries(p).map(e=>e.join('=')).join(','),
   fin=(n,p)=>{const s=ser(p),k=PT.test(n)&&s?n+'['+s+']':n;let i=fx.get(k);if(i==null){i=pal.length;pal.push(k);fx.set(k,i)}return i},
-  at=(x,y,z)=>{if(x<0||y<0||z<0||x>=X||y>=Y||z>=Z)return null;const i=K[(x*Y+y)*Z+z];return i<0?null:IP[i]},
+  at=(x,y,z)=>{if(x<0||y<0||z<0||x>=X||y>=Y||z>=Z)return null;const i=kg((x*Y+y)*Z+z);return i<0?null:IP[i]},
   ax=d=>d=='east'||d=='west',
   solid=e=>e.s??=!/leaves|^water$|^lava$|pumpkin|jack_o_lantern|melon|shulker|barrier|^bed$/.test(e.n)&&!bx(e.n,ser(e.p));
-  for(let x=0,c=0;x<X;x++)for(let y=0;y<Y;y++)for(let z=0;z<Z;z++,c++){
-    const i=K[c];if(i<0)continue;const e=IP[i];let f;
+  const p2=(x,y,z,i)=>{
+    const e=IP[i];let f;
     if(e.k=='stair'){const{facing:fc,half:h}=e.p,[dx,dz]=VEC[fc],ok=o=>o&&o.k=='stair'&&o.p.half==h,
         can=g=>{const o=at(x+VEC[g][0],y,z+VEC[g][1]);return!(o&&o.k=='stair')||o.p.facing!=fc||o.p.half!=h},
         fr=at(x+dx,y,z+dz),bk=at(x-dx,y,z-dz);let sh='straight';
@@ -257,18 +272,21 @@ function fromBE(r){
       f=fin(e.n,{facing:L.f,hinge:L.h||U&&U.h?'right':'left',open:String(L.o)})}
     else if(e.k=='scaf'){const bl=at(x,y-1,z);f=fin(e.n,{bottom:String(!(bl&&bl.n=='scaffolding'))})}
     else{f=fm.get(i);if(f==null){f=fin(e.n,e.p);fm.set(i,f)}}
-    B.push(x,y,z,f)}
+    B.push(x,y,z,f)};
+  if(SP){const kz=new Int32Array(K.n);let j=0;K.each(c=>{kz[j++]=c});kz.sort(); // 依索引排序：輸出順序與調色盤順序和掃描整個長方體時完全一致
+    for(const c of kz){const z=c%Z,t=(c-z)/Z,y=t%Y;p2((t-y)/Y,y,z,K.get(c))}}
+  else for(let x=0,c=0;x<X;x++)for(let y=0;y<Y;y++)for(let z=0;z<Z;z++,c++){const i=K[c];if(i>=0)p2(x,y,z,i)}
   return{pal,B}}
 
 // ---------- 建立網格 ----------
-async function load(pal,B){
+async function load(pal,B,sparse){ // sparse＝true：只記錄有方塊的格子（.mcworld 選取範圍用），不配置整個長方體的陣列
   if(!B.length)return say('沒有找到任何方塊',1);
   const a=[1e9,1e9,1e9],b=[-1e9,-1e9,-1e9];
   for(let i=0;i<B.length;i+=4)for(let k=0;k<3;k++){const v=B[i+k];if(v<a[k])a[k]=v;if(v>b[k])b[k]=v}
   W=b[0]-a[0]+1;H=b[1]-a[1]+1;L=b[2]-a[2]+1;
   if(W*H*L>999**3)return say('結構過大（超過 999×999×999）',1);
-  const g=new Int32Array(W*H*L).fill(-1);
-  for(let i=0;i<B.length;i+=4)g[((B[i+1]-a[1])*L+B[i+2]-a[2])*W+B[i]-a[0]]=B[i+3];
+  const g=sparse?new SG(B.length/4):new Int32Array(W*H*L).fill(-1),gt=sparse?k=>g.get(k):k=>g[k];
+  for(let i=0;i<B.length;i+=4){const k=((B[i+1]-a[1])*L+B[i+2]-a[2])*W+B[i]-a[0];if(sparse)g.set(k,B[i+3]);else g[k]=B[i+3]}
   const nm=[],ni=new Map(),NI=[],rg=u=>{let j=ni.get(u);if(j==null){j=nm.length;nm.push(u);ni.set(u,j)}return j},
   PX=pal.map((s,p)=>{const m=s.match(/^([^\[]+)(?:\[(.*)\])?$/),n=m[1],st=m[2]||'',pt=/banner$/.test(n)&&st.match(/pat=([^,]*)/),
     t=tnm(n,st,pt)??n+(/_bed$/.test(n)&&/part=head/.test(st)?'_head':/_frame$/.test(n)&&/item=/.test(st)?'_'+st.split('item=')[1].split(',')[0]:'')+(pt?'_'+(hs(pt[1])>>>0).toString(36):'');
@@ -278,12 +296,15 @@ async function load(pal,B){
     if(bs&&bs.pl)bs.pl=bs.pl.map(q=>[...q.slice(0,6),q[6][0]=='='?rg(q[6].slice(1)):rg(t+q[6]),q[7]]);if(bs&&bs.sq)bs.sq=bs.sq.map(q=>[...q.slice(0,20),q[20][0]=='='?rg(q[20].slice(1)):rg(t+q[20])]);return bs}),
   oc=pal.map((s,p)=>!PX[p]&&!/glass|leaves|^ice$|^water$|^lava$/.test(nm[NI[p]]));
   N=nm;C=nm.map(n=>{const c=col(n);return[(c>>16)/255,(c>>8&255)/255,(c&255)/255]});F=[];E=[];V=[];SQ=[];cnt=0;cb=nm.map(()=>0);
-  for(let y=0;y<H;y++)for(let z=0;z<L;z++)for(let x=0;x<W;x++){const p=g[(y*L+z)*W+x];if(p<0)continue;cnt++;cb[NI[p]]++;
-    for(let d=0;d<6;d++){const v=D[d],nx=x+v[0],ny=y+v[1],nz=z+v[2],q=nx<0||ny<0||nz<0||nx>=W||ny>=H||nz>=L?-1:g[(ny*L+nz)*W+nx];
+  const cell=(x,y,z,p)=>{cnt++;cb[NI[p]]++;
+    for(let d=0;d<6;d++){const v=D[d],nx=x+v[0],ny=y+v[1],nz=z+v[2],q=nx<0||ny<0||nz<0||nx>=W||ny>=H||nz>=L?-1:gt((ny*L+nz)*W+nx);
       if(!PX[p]){if(q<0||!oc[q]&&(PX[q]||NI[q]!=NI[p]))F.push(x,y,z,d,NI[p])}
       else for(const b of PX[p]){const a=d>>1,e=d&1?b[a]==0:b[a+3]==16;if(e&&q>=0&&oc[q])continue;const tt=b[6]??NI[p],k0=Math.floor(b[1]/16),cl=Array.isArray(tt),ta=b[3]-b[0]==1?0:2;for(let k=k0;k*16<b[4];k++){const y0=Math.max(b[1],k*16),y1=Math.min(b[4],k*16+16);if(d==2&&y1<b[4]||d==3&&y0>b[1])continue;E.push(x+b[0]/16,y+y0/16,z+b[2]/16,x+b[3]/16,y+y1/16,z+b[5]/16,d,cl?a==ta?tt[k-k0]:b[7]:tt)}}}
     if(PX[p]&&PX[p].pl)for(const q of PX[p].pl)V.push(x+q[0]/16,z+q[1]/16,x+q[2]/16,z+q[3]/16,y+q[4]/16,y+q[5]/16,q[6],q[7]??1);
-    if(PX[p]&&PX[p].sq)for(const q of PX[p].sq)SQ.push(...[0,1,2,3].flatMap(i=>[x+q[i*5]/16,y+q[i*5+1]/16,z+q[i*5+2]/16,q[i*5+3],q[i*5+4]]),q[20])}
+    if(PX[p]&&PX[p].sq)for(const q of PX[p].sq)SQ.push(...[0,1,2,3].flatMap(i=>[x+q[i*5]/16,y+q[i*5+1]/16,z+q[i*5+2]/16,q[i*5+3],q[i*5+4]]),q[20])};
+  if(sparse){const kz=new Int32Array(g.n);let j=0;g.each(k=>{kz[j++]=k});kz.sort(); // 依 (y,z,x) 排序，輸出順序與掃描整個長方體時完全一致
+    for(const k of kz){const x=k%W,t=(k-x)/W,z=t%L;cell(x,(t-z)/L,z,g.get(k))}}
+  else for(let y=0;y<H;y++)for(let z=0;z<L;z++)for(let x=0;x<W;x++){const p=g[(y*L+z)*W+x];if(p>=0)cell(x,y,z,p)}
   PX.forEach((x,p)=>{if(!x||!cb[NI[p]])return;x.forEach(b=>{if(b[6]!=null)for(const j of[b[6],b[7]].flat())if(j!=null)cb[j]=Math.max(cb[j],cb[NI[p]])});if(x.pl)for(const q of x.pl)cb[q[6]]=Math.max(cb[q[6]],cb[NI[p]]);if(x.sq)for(const q of x.sq)cb[q[20]]=Math.max(cb[q[20]],cb[NI[p]])});if(PK)await ap();show();mj()}
 
 // ---------- 3D 預覽 ----------
@@ -898,20 +919,22 @@ async function wBuild(){
   const[a1,a2,b1,b2,c1,c2]=v.map(x=>Math.round(+x)),x0=Math.min(a1,a2),x1=Math.max(a1,a2),z0=Math.min(b1,b2),z1=Math.max(b1,b2),y0=Math.min(c1,c2),y1=Math.max(c1,c2),
   X=x1-x0+1,Y=y1-y0+1,Z=z1-z0+1,n=X*Y*Z,dm=+$('#wd').value;
   if(!(n>0))return say('範圍數值不正確',1);if(X>999||Y>999||Z>999)return say('選取範圍過大（X／Y／Z 每軸上限 999 格），請縮小範圍',1);
-  let l0,l1;const UP=[],um=new Map(),BE={},
+  let cells=new SG();const UP=[],um=new Map(),BE={},
   rp=q=>{const k=q.name+JSON.stringify(q.states,(_,x)=>typeof x=='bigint'?String(x):x);let i=um.get(k);if(i==null){i=UP.length;UP.push(q);um.set(k,i)}return i},
   kk=(cx,cz,t,y)=>wI32(cx)+wI32(cz)+(dm?wI32(dm):'')+String.fromCharCode(t)+(y==null?'':String.fromCharCode(y&255)),
   ins=(x,y,z)=>x>=x0&&x<=x1&&y>=y0&&y<=y1&&z>=z0&&z<=z1;
-  try{l0=new Int16Array(n).fill(-1);let k=0;const tot=((x1>>4)-(x0>>4)+1)*((z1>>4)-(z0>>4)+1);
+  // 只記錄「有方塊」的格子（線性索引→調色盤編號），空氣不佔記憶體；第二層（含水）只在第一層沒有方塊時採用
+  try{let k=0;const tot=((x1>>4)-(x0>>4)+1)*((z1>>4)-(z0>>4)+1);
     for(let cx=x0>>4;cx<=x1>>4;cx++)for(let cz=z0>>4;cz<=z1>>4;cz++){
       if(k++%6==0){say(`轉換中… ${k}/${tot} 區塊`);await wTick()}
       for(let sy=y0>>4;sy<=y1>>4;sy++){const e=WD.db.get(kk(cx,cz,47,sy));if(!e||!e.t)continue;
-        wSub(e.v).forEach((ly,li)=>{if(li>1)return;const mp=ly.pal.map(rp);
-          for(let i=0;i<4096;i++){const wx=cx*16+(i>>8),wz=cz*16+(i>>4&15),wy=sy*16+(i&15);if(ins(wx,wy,wz))(li?l1||=new Int16Array(n).fill(-1):l0)[((wx-x0)*Y+wy-y0)*Z+wz-z0]=mp[ly.ix[i]]}})}
+        wSub(e.v).forEach((ly,li)=>{if(li>1)return;const mp=ly.pal.map(q=>AIR.test(String(q.name||'').replace(/^minecraft:/,''))?-1:rp(q));
+          for(let i=0;i<4096;i++){const m=mp[ly.ix[i]];if(!(m>=0))continue;const wx=cx*16+(i>>8),wz=cz*16+(i>>4&15),wy=sy*16+(i&15);
+            if(!ins(wx,wy,wz))continue;const c=((wx-x0)*Y+wy-y0)*Z+wz-z0;if(!li||cells.get(c)<0)cells.set(c,m)}})}
       const be=WD.db.get(kk(cx,cz,49));
       if(be&&be.t){const b=be.v;let p=0;while(p<b.length){try{const r=nbt(b.subarray(p),true);p+=nbt.e;if(ins(r.x,r.y,r.z))BE[((r.x-x0)*Y+r.y-y0)*Z+r.z-z0]={block_entity_data:r}}catch(e){break}}}}
-    const s=fromBE({size:[X,Y,Z],structure:{block_indices:[l0,l1||[]],palette:{default:{block_palette:UP,block_position_data:BE}}}});
-    base=WD.base;say('');await load(s.pal,s.B)}
+    const s=fromBE({size:[X,Y,Z],cells,structure:{palette:{default:{block_palette:UP,block_position_data:BE}}}});
+    cells=null;base=WD.base;say('');await load(s.pal,s.B,true)}
   catch(e){say('轉換失敗：'+(e instanceof RangeError?'記憶體不足，請縮小範圍':e.message),1)}}
 $('#wGo').onclick=wBuild;
 async function openWorld(u,f){
