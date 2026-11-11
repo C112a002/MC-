@@ -58,7 +58,7 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 <li>匯出為 .zip：OBJ 內含 .obj＋.mtl（依方塊上色，可用 Blender／MeshLab 開啟），STL 無顏色，適合 3D 列印。縮放 1 ＝ 每格 1 單位。</li>
 <li>植物（草、花、樹苗、作物、藤蔓等）以十字或田字平面顯示，其他非完整方塊（活板門、柵欄門、梯子、告示牌、花盆、箱子、燈籠…）也會依實際形狀顯示；STL 會把植物平面加厚成薄片。</li>
 <li>旗幟的花紋（結構檔內的 Patterns）會以程式繪製的近似圖樣顯示，並非 Mojang 原圖；匯出 OBJ 時會一併輸出旗面貼圖。</li>
-<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖，拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍上限約 1,600 萬格；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
+<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖（依各區塊最上層方塊的顏色繪製的俯視圖，草地綠、水藍、沙黃、雪白…；水越深越暗，玻璃與植物會略過；地獄顯示洞穴地面；區塊多時會邊讀邊畫），拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍每軸上限 999 格（999×999×999），實際能否處理取決於瀏覽器記憶體，過大時會提示縮小；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
 </footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -150,8 +150,8 @@ function isLE(u){
 // 索引順序：index=(x*Y+y)*Z+z；第二層（含水）只在第一層為空氣時採用
 function fromBE(r){
   const[X,Y,Z]=r.size||[],S=r.structure,PD=S.palette&&(S.palette.default||Object.values(S.palette)[0]),Pl=PD&&PD.block_palette,bi=S.block_indices;
-  if(!(X>0&&Y>0&&Z>0)||!Pl||!Array.isArray(bi)||!Array.isArray(bi[0]))throw Error('.mcstructure 內容不完整');
-  const l0=bi[0],l1=Array.isArray(bi[1])?bi[1]:[],np=Pl.length,n0=X*Y*Z;
+  if(!(X>0&&Y>0&&Z>0)||!Pl||!Array.isArray(bi)||!(bi[0]&&bi[0].length>=0))throw Error('.mcstructure 內容不完整');
+  const l0=bi[0],l1=bi[1]&&bi[1].length?bi[1]:[],np=Pl.length,n0=X*Y*Z;
   if(l0.length!=n0)throw Error('方塊數量與尺寸不符');
   const BD4=['east','west','south','north'],BFD=['down','up','north','south','west','east'],BBD=['south','west','north','east'],ND=['north','east','south','west'],
   OPP={east:'west',west:'east',north:'south',south:'north'},CCW={north:'west',west:'south',south:'east',east:'north'},VEC={east:[1,0],west:[-1,0],south:[0,1],north:[0,-1]},
@@ -266,7 +266,7 @@ async function load(pal,B){
   const a=[1e9,1e9,1e9],b=[-1e9,-1e9,-1e9];
   for(let i=0;i<B.length;i+=4)for(let k=0;k<3;k++){const v=B[i+k];if(v<a[k])a[k]=v;if(v>b[k])b[k]=v}
   W=b[0]-a[0]+1;H=b[1]-a[1]+1;L=b[2]-a[2]+1;
-  if(W*H*L>8e7)return say('結構過大（超過 8000 萬格）',1);
+  if(W*H*L>999**3)return say('結構過大（超過 999×999×999）',1);
   const g=new Int32Array(W*H*L).fill(-1);
   for(let i=0;i<B.length;i+=4)g[((B[i+1]-a[1])*L+B[i+2]-a[2])*W+B[i]-a[0]]=B[i+3];
   const nm=[],ni=new Map(),NI=[],rg=u=>{let j=ni.get(u);if(j==null){j=nm.length;nm.push(u);ni.set(u,j)}return j},
@@ -795,18 +795,99 @@ function wSub(v){let p=0;const ver=v[p++];if(ver!=1&&ver<8)return[];const n=ver=
 function wScan(db){const ch={};for(const[k,e]of db){if(!e.t)continue;const t=k.length,ty=t==9?k.charCodeAt(8):t==13?k.charCodeAt(12):k.charCodeAt(t-2);
     if(ty!=44&&ty!=118&&ty!=47)continue;const g=i=>k.charCodeAt(i)|k.charCodeAt(i+1)<<8|k.charCodeAt(i+2)<<16|k.charCodeAt(i+3)<<24;
     (ch[t>=13?g(8):0]??=new Set()).add(g(0)+','+g(4))}return ch}
+// ---------- 世界地圖：依方塊顏色繪製的俯視圖 ----------
+// 每個區塊取 16×16 欄的最上層方塊顏色（沿用 3D 模型的 col()），先畫到離屏畫布，wDraw 再縮放貼到地圖上
+const wKy=(cx,cz,dm,sy)=>wI32(cx)+wI32(cz)+(dm?wI32(dm):'')+'/'+String.fromCharCode(sy&255),
+// 俯視時視為透明的方塊：空氣、玻璃、植物、火把、告示牌等（地圖上看到的是它底下的方塊）
+wSK=new RegExp('^('+['air','cave_air','void_air','structure_void','light(_block.*)?','barrier','border_block','allow','deny','moving_block',
+  '(soul_)?fire','trip_?wire','redstone_wire','(.+_)?torch','ladder','(.+_)?rail','.*glass.*','cobweb|web|string','.*_sign|.*_banner','.*_button|lever|.*_pressure_plate','(glow_)?(item_)?frame',
+  '.*vines?(_plant)?','glow_lichen|sculk_vein','.*_sapling|sapling|.*propagule','(short_|tall_|short_dry_|tall_dry_)grass|tallgrass|double_plant|(large_)?fern|dead_?bush|bush|firefly_bush',
+  'yellow_flower|red_flower|dandelion|poppy|blue_orchid|allium|azure_bluet|.*_tulip|oxeye_daisy|cornflower|lily_of_the_valley|wither_rose|torchflower|sunflower|lilac|rose_bush|peony|pitcher_plant|pink_petals|wildflowers|leaf_litter|cactus_flower',
+  '(red|brown)_mushroom|.*_roots|nether_sprouts|sugar_cane|reeds|lily_pad|waterlily|kelp(_plant)?|.*seagrass|sea_pickle|.*coral_fan|.*coral_wall_fan',
+  'wheat|carrots|potatoes|beetroots?|nether_wart|melon_stem|pumpkin_stem|sweet_berry_bush'].join('|')+')$'),
+// 扁平化之前的舊版方塊：顏色放在狀態裡
+wLG={wool:'wool',carpet:'carpet',concrete:'concrete',concretePowder:'concrete_powder',concrete_powder:'concrete_powder',stained_hardened_clay:'terracotta'},
+wNm=q=>{const n=String(q.name||'').replace(/^minecraft:/,''),s=q.states||{},c=s.color;
+  if(wLG[n]&&c)return(c=='silver'?'light_gray':c)+'_'+wLG[n];
+  if(n=='grass')return'grass_block';
+  if(n=='sand'&&s.sand_type=='red')return'red_sand';
+  return/^(flowing_)?water$/.test(n)?'water':n},
+// col() 配不到或配錯的方塊（例如 red_sand 會被當成紅色）
+wOV=[[/^red_sand$/,0xbe6621],[/^(cut_|chiseled_|smooth_)?red_sandstone/,0xb4592a],[/^blue_ice$/,0x74a8fd],[/^packed_ice$/,0xa5c2fd],[/^powder_snow$/,0xf6fafa],[/^mycelium$/,0x6f6369],
+  [/^end_stone/,0xdfdf9f],[/^bedrock$/,0x555555],[/^soul_sand$/,0x5b4637],[/^soul_soil$/,0x4b3a30],[/basalt$/,0x4b4b52],[/^clay$/,0xa4a8b8],[/^tuff/,0x6d6d63],[/^calcite$/,0xe0e0dc],
+  [/^dripstone_block$/,0x866a5a],[/^nether_wart_block$/,0x7a0f0f],[/^magma(_block)?$/,0x8f3d17],[/^(hardened_clay|terracotta)$/,0x9e5c43],[/^cherry_leaves$/,0xe5b4b6],[/^glowstone$/,0xf7d17a]],
+// 各色陶土（惡地）：用遊戲裡偏泥土的色調，不用染料色
+wTC={white:0xd1b1a1,orange:0xa15325,magenta:0x95586c,light_blue:0x706c8a,yellow:0xba8523,lime:0x677535,pink:0xa14e4e,gray:0x392a23,light_gray:0x876b62,cyan:0x575b5b,purple:0x764656,blue:0x4a3b5b,brown:0x4d3323,green:0x4c532a,red:0x8f3d2e,black:0x251610},
+wCc=new Map(),wSc2=new Map(),
+wC=n=>{let v=wCc.get(n);if(v==null){const o=wOV.find(e=>e[0].test(n)),t=/^(\w+?)_terracotta$/.exec(n);v=o?o[1]:t&&wTC[t[1]]||col(n);wCc.set(n,v)}return v},
+wVs=pal=>pal.map(q=>{const n=wNm(q);let k=wSc2.get(n);if(k==null)wSc2.set(n,k=wSK.test(n));return k?null:n}),
+wSc=(k,f)=>{const g=v=>Math.max(0,Math.min(255,Math.round(v*f)));return g(k>>16)<<16|g(k>>8&255)<<8|g(k&255)},
+// 水：越深越藍越暗，淺水會透出水底方塊的顏色
+wWc=(d,u)=>{let w=0x3f76e4;if(u>=0){const k=Math.min(.85,.4+d*.05),m=(a,b)=>Math.round(a*k+b*(1-k));w=m(w>>16,u>>16)<<16|m(w>>8&255,u>>8&255)<<8|m(w&255,u&255)}return wSc(w,1-Math.min(d,40)*.006)};
+// 回傳 256 欄（索引＝z*16+x）的 0xRRGGBB，沒有方塊則為 -1
+function wTop(cx,cz,dm){
+  const db=WD.db,out=new Int32Array(256).fill(-1),S=new Uint8Array(256).fill(dm==1?3:0),H=new Int16Array(256).fill(-32768),Dp=new Uint8Array(256),Fb=new Int32Array(256).fill(-1),Wa=new Uint8Array(256);
+  // S：0 找最上層方塊／1 在水中往下找水底／2 完成／3 地獄頂部（先穿過頂部岩層，取洞穴地面）
+  let live=256;
+  for(let sy=dm==1?7:dm==2?15:23,lo=dm==1||dm==2?0:-5;sy>=lo&&live>0;sy--){
+    const e=db.get(wKy(cx,cz,dm,sy));let ly;
+    if(!e||!e.t||!(ly=wSub(e.v))[0]){for(let c=0;c<256;c++)if(S[c]==3)S[c]=0;continue}
+    const l0=ly[0],l1=ly[1],v0=wVs(l0.pal),w1=l1&&l1.pal.map(q=>wNm(q)=='water');
+    for(let x=0;x<16;x++)for(let z=0;z<16;z++){
+      const c=z*16+x;let s=S[c];if(s==2)continue;
+      for(let y=15,bs=(x*16+z)*16;y>=0;y--){
+        let n=v0[l0.ix[bs+y]];if(n==null&&w1&&w1[l1.ix[bs+y]])n='water';
+        if(s==3){if(n==null)s=0;else if(Fb[c]<0)Fb[c]=wC(n);continue}
+        if(n==null)continue;
+        if(s==0){H[c]=sy*16+y;if(n=='water'){s=1;Dp[c]=1;Wa[c]=1;continue}out[c]=wC(n);s=2;live--;break}
+        if(n=='water'){if(Dp[c]<255)Dp[c]++;continue}
+        out[c]=wWc(Dp[c],wC(n));s=2;live--;break}
+      S[c]=s}}
+  for(let c=0;c<256;c++){if(S[c]==1)out[c]=wWc(Dp[c],-1);else if(S[c]==3)out[c]=Fb[c]}
+  // 地形起伏：比北邊（上方）一欄高就變亮、低就變暗，類似遊戲內的地圖
+  for(let c=255;c>=16;c--){const k=out[c];if(k<0||Wa[c]||H[c]==-32768||out[c-16]<0||H[c-16]==-32768)continue;out[c]=wSc(k,1+Math.max(-.15,Math.min(.15,(H[c]-H[c-16])*.05)))}
+  return out}
+// 把一個區塊畫進離屏畫布（每區塊 pr×pr 像素；pr<16 時把 16÷pr 見方的欄取平均）
+function wTile(g,m,cx,cz,dm){
+  const C=wTop(cx,cz,dm),pr=m.pr,st=16/pr,im=g.createImageData(pr,pr),o=im.data;let any=0;
+  for(let j=0;j<pr;j++)for(let i=0;i<pr;i++){let r=0,gr=0,b=0,n=0;
+    for(let z=j*st;z<(j+1)*st;z++)for(let x=i*st;x<(i+1)*st;x++){const k=C[z*16+x];if(k>=0){r+=k>>16;gr+=k>>8&255;b+=k&255;n++}}
+    if(n){const q=(j*pr+i)*4;o[q]=r/n;o[q+1]=gr/n;o[q+2]=b/n;o[q+3]=255;any=1}}
+  if(!any)for(let q=0;q<o.length;q+=4){o[q]=o[q+1]=o[q+2]=120;o[q+3]=255} // 解析不出任何方塊的區塊：灰色
+  g.putImageData(im,(cx-m.a)*pr,(cz-m.c)*pr)}
+// 分批繪製（每批約 30 毫秒），邊畫邊更新地圖；切換維度或載入別的世界會中斷，之後回來會接著畫
+async function wMapRun(m,dm){
+  const W=WD,g=m.cv.getContext('2d');m.run=true;let t=performance.now();
+  try{while(m.i<m.list.length&&WD===W&&WD.m===m){
+      const[cx,cz]=m.list[m.i++];
+      try{wTile(g,m,cx,cz,dm)}catch(e){}
+      if(performance.now()-t>30){wDraw();await wTick();t=performance.now()}}
+    if(m.i>=m.list.length)m.done=true}
+  finally{m.run=false}
+  if(WD===W)wDraw()}
+function wMapInit(){
+  const dm=+$('#wd').value,{a,b,c,d}=WD.bd,bw=b-a+1,bh=d-c+1,CAP=1<<23;WD.maps??={};let m=WD.maps[dm];
+  if(!m){let pr=16;while(pr>1&&(bw*pr>16384||bh*pr>16384||bw*bh*pr*pr>CAP))pr>>=1;
+    m={pr,a,c,i:0,list:WD.cur,done:false,run:false,cv:null};
+    if(bw*pr<=16384&&bh*pr<=16384&&bw*bh*pr*pr<=CAP){m.cv=document.createElement('canvas');m.cv.width=bw*pr;m.cv.height=bh*pr}  // 範圍大到畫不下時維持原本的綠色區塊
+    WD.maps[dm]=m}
+  WD.m=m;if(m.cv&&!m.done&&!m.run)wMapRun(m,dm)}
 const wIn=['wx1','wx2','wz1','wz2','wy1','wy2'];
 function wDim(){const d=+$('#wd').value,a=[...WD.ch[d]].map(s=>s.split(',').map(Number));let n=1e9,x=-1e9,c=1e9,z=-1e9;
   for(const[p,q]of a){n=Math.min(n,p);x=Math.max(x,p);c=Math.min(c,q);z=Math.max(z,q)}
-  WD.cur=a;WD.bd={a:n,b:x,c,d:z};$('#wy1').value=d?0:-64;$('#wy2').value=d==0?319:d==1?127:255;wIn.slice(0,4).forEach(i=>$('#'+i).value='');wDraw()}
-function wDraw(){if(!WD)return;const{a,b,c,d}=WD.bd,w=wm.clientWidth||300,h=220,s=Math.max(1,Math.min(24,w/(b-a+3),h/(d-c+3))),ox=(w-(b-a+1)*s)/2,oz=(h-(d-c+1)*s)/2;
-  WD.v={s,ox,oz};wm.width=w;wm.height=h;const g=wm.getContext('2d'),q=Math.max(1,s-(s>4));g.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--ac');
-  for(const[p,r]of WD.cur)g.fillRect(ox+(p-a)*s,oz+(r-c)*s,q,q);
+  WD.cur=a;WD.bd={a:n,b:x,c,d:z};$('#wy1').value=d?0:-64;$('#wy2').value=d==0?319:d==1?127:255;wIn.slice(0,4).forEach(i=>$('#'+i).value='');wMapInit();wDraw()}
+function wDraw(){if(!WD)return;const{a,b,c,d}=WD.bd,w=wm.clientWidth||300,h=220,s=Math.max(1,Math.min(24,w/(b-a+3),h/(d-c+3))),ox=(w-(b-a+1)*s)/2,oz=(h-(d-c+1)*s)/2,m=WD.m&&WD.m.cv?WD.m:null,r=Math.min(devicePixelRatio||1,2),
+  pg=m&&!m.done?`（繪製地圖中 ${m.i}/${m.list.length}）`:'';
+  WD.v={s,ox,oz};wm.width=w*r;wm.height=h*r;const g=wm.getContext('2d'),q=Math.max(1,s-(s>4));g.scale(r,r);
+  if(m){g.imageSmoothingEnabled=s*r<m.pr;g.imageSmoothingQuality='high';g.drawImage(m.cv,ox,oz,(b-a+1)*s,(d-c+1)*s);
+    if(s>=8){g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=1;g.beginPath();for(let i=0;i<=b-a+1;i++){const X=Math.round(ox+i*s)+.5;g.moveTo(X,oz);g.lineTo(X,oz+(d-c+1)*s)}for(let j=0;j<=d-c+1;j++){const Y=Math.round(oz+j*s)+.5;g.moveTo(ox,Y);g.lineTo(ox+(b-a+1)*s,Y)}g.stroke()}}
+  else{g.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--ac');for(const[p,z]of WD.cur)g.fillRect(ox+(p-a)*s,oz+(z-c)*s,q,q)}
   const v=wIn.map(i=>$('#'+i).value);
   if(v.slice(0,4).every(x=>x!=='')){const[x1,x2,z1,z2,y1,y2]=v.map(Number),dx=Math.abs(x2-x1)+1,dz=Math.abs(z2-z1)+1,dy=Math.abs(y2-y1)+1;
-    g.strokeStyle='#e53935';g.lineWidth=2;g.strokeRect(ox+(Math.min(x1,x2)/16-a)*s,oz+(Math.min(z1,z2)/16-c)*s,dx/16*s,dz/16*s);
-    $('#wi').textContent=`選取 ${dx}×${dy}×${dz} ＝ ${(dx*dy*dz).toLocaleString()} 格${dx*dy*dz>16e6?'（超過 1,600 萬格上限，請縮小）':''}`}
-  else $('#wi').textContent=`共 ${WD.cur.length} 個區塊；在地圖上拖曳框選範圍（上方＝北）`}
+    const rx=ox+(Math.min(x1,x2)/16-a)*s,rz=oz+(Math.min(z1,z2)/16-c)*s,rw=dx/16*s,rh=dz/16*s; // 白底紅框，彩色地圖上才看得清楚
+    g.fillStyle='rgba(255,255,255,.15)';g.fillRect(rx,rz,rw,rh);g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=4;g.strokeRect(rx,rz,rw,rh);g.strokeStyle='#e53935';g.lineWidth=2;g.strokeRect(rx,rz,rw,rh);
+    $('#wi').textContent=`選取 ${dx}×${dy}×${dz} ＝ ${(dx*dy*dz).toLocaleString()} 格${Math.max(dx,dy,dz)>999?'（超過每軸 999 上限，請縮小）':''}${pg}`}
+  else $('#wi').textContent=`共 ${WD.cur.length} 個區塊；在地圖上拖曳框選範圍（上方＝北）${pg}`}
 const wCk=e=>{const r=wm.getBoundingClientRect(),{s,ox,oz}=WD.v;return[Math.floor((e.clientX-r.left-ox)/s)+WD.bd.a,Math.floor((e.clientY-r.top-oz)/s)+WD.bd.c]};
 wm.onpointerdown=e=>{if(!WD)return;wm.setPointerCapture(e.pointerId);wp0=wCk(e);wm.onpointermove(e)};
 wm.onpointermove=e=>{if(!wp0)return;const q=wCk(e);$('#wx1').value=Math.min(wp0[0],q[0])*16;$('#wx2').value=Math.max(wp0[0],q[0])*16+15;$('#wz1').value=Math.min(wp0[1],q[1])*16;$('#wz2').value=Math.max(wp0[1],q[1])*16+15;wDraw()};
@@ -816,22 +897,22 @@ async function wBuild(){
   if(!WD)return;const v=wIn.map(i=>$('#'+i).value);if(v.some(x=>x===''))return say('請先在地圖上拖曳框選區域',1);
   const[a1,a2,b1,b2,c1,c2]=v.map(x=>Math.round(+x)),x0=Math.min(a1,a2),x1=Math.max(a1,a2),z0=Math.min(b1,b2),z1=Math.max(b1,b2),y0=Math.min(c1,c2),y1=Math.max(c1,c2),
   X=x1-x0+1,Y=y1-y0+1,Z=z1-z0+1,n=X*Y*Z,dm=+$('#wd').value;
-  if(!(n>0))return say('範圍數值不正確',1);if(n>16e6)return say('選取範圍過大（上限約 1,600 萬格），請縮小範圍',1);
-  const l0=new Array(n).fill(-1),l1=new Array(n).fill(-1),UP=[],um=new Map(),BE={},
+  if(!(n>0))return say('範圍數值不正確',1);if(X>999||Y>999||Z>999)return say('選取範圍過大（X／Y／Z 每軸上限 999 格），請縮小範圍',1);
+  let l0,l1;const UP=[],um=new Map(),BE={},
   rp=q=>{const k=q.name+JSON.stringify(q.states,(_,x)=>typeof x=='bigint'?String(x):x);let i=um.get(k);if(i==null){i=UP.length;UP.push(q);um.set(k,i)}return i},
   kk=(cx,cz,t,y)=>wI32(cx)+wI32(cz)+(dm?wI32(dm):'')+String.fromCharCode(t)+(y==null?'':String.fromCharCode(y&255)),
   ins=(x,y,z)=>x>=x0&&x<=x1&&y>=y0&&y<=y1&&z>=z0&&z<=z1;
-  try{let k=0;const tot=((x1>>4)-(x0>>4)+1)*((z1>>4)-(z0>>4)+1);
+  try{l0=new Int16Array(n).fill(-1);let k=0;const tot=((x1>>4)-(x0>>4)+1)*((z1>>4)-(z0>>4)+1);
     for(let cx=x0>>4;cx<=x1>>4;cx++)for(let cz=z0>>4;cz<=z1>>4;cz++){
       if(k++%6==0){say(`轉換中… ${k}/${tot} 區塊`);await wTick()}
       for(let sy=y0>>4;sy<=y1>>4;sy++){const e=WD.db.get(kk(cx,cz,47,sy));if(!e||!e.t)continue;
         wSub(e.v).forEach((ly,li)=>{if(li>1)return;const mp=ly.pal.map(rp);
-          for(let i=0;i<4096;i++){const wx=cx*16+(i>>8),wz=cz*16+(i>>4&15),wy=sy*16+(i&15);if(ins(wx,wy,wz))(li?l1:l0)[((wx-x0)*Y+wy-y0)*Z+wz-z0]=mp[ly.ix[i]]}})}
+          for(let i=0;i<4096;i++){const wx=cx*16+(i>>8),wz=cz*16+(i>>4&15),wy=sy*16+(i&15);if(ins(wx,wy,wz))(li?l1||=new Int16Array(n).fill(-1):l0)[((wx-x0)*Y+wy-y0)*Z+wz-z0]=mp[ly.ix[i]]}})}
       const be=WD.db.get(kk(cx,cz,49));
       if(be&&be.t){const b=be.v;let p=0;while(p<b.length){try{const r=nbt(b.subarray(p),true);p+=nbt.e;if(ins(r.x,r.y,r.z))BE[((r.x-x0)*Y+r.y-y0)*Z+r.z-z0]={block_entity_data:r}}catch(e){break}}}}
-    const s=fromBE({size:[X,Y,Z],structure:{block_indices:[l0,l1],palette:{default:{block_palette:UP,block_position_data:BE}}}});
+    const s=fromBE({size:[X,Y,Z],structure:{block_indices:[l0,l1||[]],palette:{default:{block_palette:UP,block_position_data:BE}}}});
     base=WD.base;say('');await load(s.pal,s.B)}
-  catch(e){say('轉換失敗：'+e.message,1)}}
+  catch(e){say('轉換失敗：'+(e instanceof RangeError?'記憶體不足，請縮小範圍':e.message),1)}}
 $('#wGo').onclick=wBuild;
 async function openWorld(u,f){
   const m=wUnz(u),fs=[...m.keys()].filter(k=>/(^|\/)db\/[^/]+\.(ldb|log)$/.test(k));
@@ -847,7 +928,7 @@ async function openWorld(u,f){
 // ---------- 匯入 ----------
 async function openFile(f){
   try{say('讀取中…');await new Promise(r=>setTimeout(r,30));
-    let u=new Uint8Array(await f.arrayBuffer());if(u[0]==0x50&&u[1]==0x4b){await openWorld(u,f);return}$('#wp').style.display='none';setTimeout(rs,50);if(u[0]==0x1f&&u[1]==0x8b)u=await gunzip(u);
+    let u=new Uint8Array(await f.arrayBuffer());if(u[0]==0x50&&u[1]==0x4b){await openWorld(u,f);return}$('#wp').style.display='none';WD=null;setTimeout(rs,50);if(u[0]==0x1f&&u[1]==0x8b)u=await gunzip(u);
     const s=fromNBT(nbt(u,isLE(u)));base=f.name.replace(/\.[^.]*$/,'').replace(/[^\w\u4e00-\u9fff-]+/g,'_')||'model';load(s.pal,s.B)}
   catch(e){say('無法解析此檔案：'+e.message,1)}}
 $('#fi').onchange=e=>{const f=e.target.files[0];f&&openFile(f)};
