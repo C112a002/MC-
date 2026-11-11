@@ -21,7 +21,7 @@ button:disabled{opacity:.4}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
 #hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mu);pointer-events:none}
 .row{display:flex;gap:8px;align-items:center}.row button{flex:1}
-#ks{width:64px;font:inherit;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
+#ks,.wn,#wd{width:64px;font:inherit;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
 #info{font-size:13px;color:var(--mu)}#msg{font-size:13px}#msg.err{color:var(--er)}
 details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;padding-left:20px}
 #tp{flex:none;max-height:36vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
@@ -31,11 +31,20 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 .th{display:flex;gap:4px;margin-bottom:4px}
 .tc canvas{position:static;inset:auto;width:40px;height:40px;touch-action:auto;image-rendering:pixelated;border:1px solid var(--bd);border-radius:4px;cursor:pointer;background:repeating-conic-gradient(#888 0 25%,#bbb 0 50%) 0 0/8px 8px}
 .tc button{padding:0 6px;font-size:11px}
+#wd{width:auto}
+#wp{flex:none;max-height:44vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
+#wp h4{margin:0;font-size:13px;flex:1}
+#wm{position:static;inset:auto;width:100%;height:220px;margin-top:6px;border:1px solid var(--bd);border-radius:8px;background:var(--st);cursor:crosshair}
+.wg{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:6px 0}
 </style>
 </head>
 <body>
-<header><b>🧱 MC 結構轉 3D 模型</b><label class="btn pri">匯入結構檔<input type="file" id="fi" hidden></label><button id="bS">範例</button></header>
-<div id="stage"><canvas id="cv"></canvas><div id="hint">點右上「匯入結構檔」選擇 .nbt／.schem／.litematic／.mcstructure，<br>或將檔案拖曳到此處</div></div>
+<header><b>🧱 MC 結構轉 3D 模型</b><label class="btn pri">匯入結構／世界檔<input type="file" id="fi" hidden></label><button id="bS">範例</button></header>
+<div id="stage"><canvas id="cv"></canvas><div id="hint">點右上「匯入結構／世界檔」選擇 .nbt／.schem／.litematic／.mcstructure／.mcworld，<br>或將檔案拖曳到此處</div></div>
+<section id="wp"><div class="row"><h4>🌍 選擇世界區域</h4><select id="wd"></select></div>
+<canvas id="wm"></canvas><div class="tn" id="wi"></div>
+<div class="wg"><label>X <input class="wn" id="wx1" type="number"> ~ <input class="wn" id="wx2" type="number"></label><label>Z <input class="wn" id="wz1" type="number"> ~ <input class="wn" id="wz2" type="number"></label><label>Y <input class="wn" id="wy1" type="number"> ~ <input class="wn" id="wy2" type="number"></label></div>
+<button id="wGo" class="pri" style="width:100%">轉成 3D 模型</button></section>
 <section id="tp"><div class="row"><h4 id="tt">方塊材質</h4><label class="btn">匯入材質包<input type="file" id="fz" accept=".zip,.jar" hidden></label><button id="bR">全部還原</button></div>
 <div class="tn">預設會連線到 Mojang 官方 GitHub（Mojang/bedrock-samples）載入原版方塊貼圖；找不到對應貼圖的方塊（如床、旗幟）才使用程式產生的近似貼圖。點縮圖上傳自己的圖片即可替換；「匯入材質包」可讀取你自己的材質包 .zip 或遊戲 .jar（僅在本機處理）。匯出 OBJ 會附上目前使用的貼圖（官方貼圖版權屬 Mojang／Microsoft，請留意使用規範）。</div>
 <div id="tl"></div><input type="file" id="fu" accept="image/*" hidden></section>
@@ -49,7 +58,7 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 <li>匯出為 .zip：OBJ 內含 .obj＋.mtl（依方塊上色，可用 Blender／MeshLab 開啟），STL 無顏色，適合 3D 列印。縮放 1 ＝ 每格 1 單位。</li>
 <li>植物（草、花、樹苗、作物、藤蔓等）以十字或田字平面顯示，其他非完整方塊（活板門、柵欄門、梯子、告示牌、花盆、箱子、燈籠…）也會依實際形狀顯示；STL 會把植物平面加厚成薄片。</li>
 <li>旗幟的花紋（結構檔內的 Patterns）會以程式繪製的近似圖樣顯示，並非 Mojang 原圖；匯出 OBJ 時會一併輸出旗面貼圖。</li>
-<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li></ol></details>
+<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖，拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍上限約 1,600 萬格；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
 </footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -92,7 +101,7 @@ function nbt(u,le){ // le：true＝小端序（基岩版 .mcstructure）
     case 11:{const n=dv.getInt32(p,le),a=[];p+=4;for(let i=0;i<n;i++){a.push(dv.getInt32(p,le));p+=4}return a}
     case 12:{const n=dv.getInt32(p,le),a=new BigUint64Array(n);p+=4;for(let i=0;i<n;i++){a[i]=dv.getBigUint64(p,le);p+=8}return a}
   }throw Error('NBT 格式錯誤')};
-  if(dv.getInt8(p++)!=10)throw Error('不是 NBT 檔');str();return rd(10)}
+  if(dv.getInt8(p++)!=10)throw Error('不是 NBT 檔');str();const r=rd(10);nbt.e=p;return r}
 async function gunzip(u){
   if(window.DecompressionStream)return new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   if(window.pako)return pako.ungzip(u);throw Error('瀏覽器不支援解壓縮')}
@@ -738,10 +747,107 @@ async function ex(t){
     if(t=='obj'){const[a,m,ps]=await obj(k);fs=[{n:base+'.obj',d:te.encode(a)},{n:base+'.mtl',d:te.encode(m)},...ps]}else fs=[{n:base+'.stl',d:stl(k)}];
     say('');await save(base+'_'+t+'.zip',zip(fs))}catch(e){say('匯出失敗：'+e.message,1)}}
 
+// ---------- .mcworld（基岩版世界）匯入 ----------
+// 流程：解開 zip → 讀 db/ 的 LevelDB（.ldb／.log）→ 取出子區塊 → 組成與 .mcstructure 相同的資料 → 交給 fromBE
+const wU32=(u,p)=>(u[p]|u[p+1]<<8|u[p+2]<<16|u[p+3]<<24)>>>0,wI32=v=>String.fromCharCode(v&255,v>>8&255,v>>16&255,v>>>24),
+wVi=(u,o)=>{let r=0,m=1,b;do{b=u[o.p++];r+=(b&127)*m;m*=128}while(b&128);return r},
+wCat=a=>{if(a.length==1)return a[0];const r=new Uint8Array(a.reduce((s,x)=>s+x.length,0));let p=0;for(const x of a){r.set(x,p);p+=x.length}return r},
+wTick=()=>new Promise(r=>setTimeout(r)),wm=$('#wm');
+let WD=null,wp0=null;
+function wUnz(u){let e=u.length-22;while(e>=0&&wU32(u,e)!=0x06054b50)e--;if(e<0)throw Error('不是有效的 zip／.mcworld');
+  const n=u[e+10]|u[e+11]<<8,m=new Map(),td=new TextDecoder();let p=wU32(u,e+16);
+  for(let i=0;i<n;i++){const nl=u[p+28]|u[p+29]<<8,el=u[p+30]|u[p+31]<<8,cl=u[p+32]|u[p+33]<<8;
+    m.set(td.decode(u.subarray(p+46,p+46+nl)),[wU32(u,p+42),u[p+10],wU32(u,p+20)]);p+=46+nl+el+cl}
+  return m}
+function wGet(u,[o,me,cs]){const a=o+30+(u[o+26]|u[o+27]<<8)+(u[o+28]|u[o+29]<<8),d=u.subarray(a,a+cs);return me?pako.inflateRaw(d):d}
+function wSnap(s){const o={p:0},d=new Uint8Array(wVi(s,o));let q=0,p=o.p;
+  while(p<s.length){const t=s[p++];let l,f;
+    if(!(t&3)){l=t>>2;if(l>=60){const k=l-59;l=0;for(let i=0;i<k;i++)l|=s[p++]<<8*i}l++;d.set(s.subarray(p,p+l),q);p+=l;q+=l}
+    else{if((t&3)==1){l=4+(t>>2&7);f=(t>>5)<<8|s[p++]}else if((t&3)==2){l=1+(t>>2);f=s[p]|s[p+1]<<8;p+=2}else{l=1+(t>>2);f=wU32(s,p);p+=4}
+      for(let i=0;i<l;i++,q++)d[q]=d[q-f]}}
+  return d}
+const wBlk=(u,off,sz)=>{const d=u.subarray(off,off+sz),t=u[off+sz];return t==0?d:t==1?wSnap(d):t==2?pako.inflate(d):pako.inflateRaw(d)};
+function wEnts(b,fn){const n=wU32(b,b.length-4),end=b.length-4-4*n,o={p:0},kb=new Uint8Array(1024);
+  while(o.p<end){const sh=wVi(b,o),ns=wVi(b,o),vl=wVi(b,o);kb.set(b.subarray(o.p,o.p+ns),sh);o.p+=ns;fn(kb,sh+ns,b.subarray(o.p,o.p+vl));o.p+=vl}}
+// 只保留區塊相關的鍵：版本(44／118)、子區塊(47)、方塊實體(49)；同一個鍵取序號最大者
+function wPut(db,kb,kl,seq,ty,v){
+  const tg=kl==9?kb[8]:kl==13?kb[12]:kl==10?(kb[8]==47?47:0):kl==14?(kb[12]==47?47:0):0;
+  if(tg!=44&&tg!=118&&tg!=47&&tg!=49)return;
+  let k='';for(let i=0;i<kl;i++)k+=String.fromCharCode(kb[i]);
+  const e=db.get(k);if(!e||e.s<seq)db.set(k,{s:seq,t:ty,v:ty?v.slice():null})}
+function wLdb(u,db){const o={p:u.length-48};wVi(u,o);wVi(u,o);const io=wVi(u,o),is=wVi(u,o);
+  wEnts(wBlk(u,io,is),(k,kl,v)=>{const q={p:0},off=wVi(v,q),sz=wVi(v,q);
+    wEnts(wBlk(u,off,sz),(kb,kl2,vv)=>{const n=kl2-8,lo=wU32(kb,n),hi=wU32(kb,n+4);wPut(db,kb,n,hi*16777216+(lo>>>8),lo&255,vv)})})}
+function wLog(u,db){let rec=[],p=0;
+  while(p+7<=u.length){const r=32768-p%32768;if(r<7){p+=r;continue}
+    const len=u[p+4]|u[p+5]<<8,ty=u[p+6];p+=7;if(!ty&&!len)continue;
+    if(ty==1||ty==2)rec=[];rec.push(u.subarray(p,p+len));p+=len;
+    if(ty==1||ty==4){const b=wCat(rec);rec=[];let seq=wU32(b,0)+wU32(b,4)*4294967296;const n=wU32(b,8),o={p:12};
+      for(let i=0;i<n&&o.p<b.length;i++,seq++){const t=b[o.p++],kl=wVi(b,o),ks=b.subarray(o.p,o.p+kl);o.p+=kl;let v=null;if(t){const vl=wVi(b,o);v=b.subarray(o.p,o.p+vl);o.p+=vl}wPut(db,ks,kl,seq,t,v)}}}}
+// 子區塊（16×16×16）：回傳每個儲存層 {pal:[{name,states}], ix:Uint16Array(4096)}，索引＝(x*16+z)*16+y
+function wSub(v){let p=0;const ver=v[p++];if(ver!=1&&ver<8)return[];const n=ver==1?1:v[p++];if(ver>=9)p++;
+  const dv=new DataView(v.buffer,v.byteOffset,v.byteLength),ls=[];
+  for(let s=0;s<n;s++){const bits=v[p++]>>1,ix=new Uint16Array(4096);
+    if(bits){const per=Math.floor(32/bits),m=(1<<bits)-1;for(let i=0;i<4096;i++)ix[i]=dv.getUint32(p+4*Math.floor(i/per),true)>>>(i%per*bits)&m;p+=4*Math.ceil(4096/per)}
+    const np=dv.getInt32(p,true);p+=4;const pal=[];for(let i=0;i<np;i++){pal.push(nbt(v.subarray(p),true));p+=nbt.e}
+    ls.push({pal,ix})}
+  return ls}
+function wScan(db){const ch={};for(const[k,e]of db){if(!e.t)continue;const t=k.length,ty=t==9?k.charCodeAt(8):t==13?k.charCodeAt(12):k.charCodeAt(t-2);
+    if(ty!=44&&ty!=118&&ty!=47)continue;const g=i=>k.charCodeAt(i)|k.charCodeAt(i+1)<<8|k.charCodeAt(i+2)<<16|k.charCodeAt(i+3)<<24;
+    (ch[t>=13?g(8):0]??=new Set()).add(g(0)+','+g(4))}return ch}
+const wIn=['wx1','wx2','wz1','wz2','wy1','wy2'];
+function wDim(){const d=+$('#wd').value,a=[...WD.ch[d]].map(s=>s.split(',').map(Number));let n=1e9,x=-1e9,c=1e9,z=-1e9;
+  for(const[p,q]of a){n=Math.min(n,p);x=Math.max(x,p);c=Math.min(c,q);z=Math.max(z,q)}
+  WD.cur=a;WD.bd={a:n,b:x,c,d:z};$('#wy1').value=d?0:-64;$('#wy2').value=d==0?319:d==1?127:255;wIn.slice(0,4).forEach(i=>$('#'+i).value='');wDraw()}
+function wDraw(){if(!WD)return;const{a,b,c,d}=WD.bd,w=wm.clientWidth||300,h=220,s=Math.max(1,Math.min(24,w/(b-a+3),h/(d-c+3))),ox=(w-(b-a+1)*s)/2,oz=(h-(d-c+1)*s)/2;
+  WD.v={s,ox,oz};wm.width=w;wm.height=h;const g=wm.getContext('2d'),q=Math.max(1,s-(s>4));g.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--ac');
+  for(const[p,r]of WD.cur)g.fillRect(ox+(p-a)*s,oz+(r-c)*s,q,q);
+  const v=wIn.map(i=>$('#'+i).value);
+  if(v.slice(0,4).every(x=>x!=='')){const[x1,x2,z1,z2,y1,y2]=v.map(Number),dx=Math.abs(x2-x1)+1,dz=Math.abs(z2-z1)+1,dy=Math.abs(y2-y1)+1;
+    g.strokeStyle='#e53935';g.lineWidth=2;g.strokeRect(ox+(Math.min(x1,x2)/16-a)*s,oz+(Math.min(z1,z2)/16-c)*s,dx/16*s,dz/16*s);
+    $('#wi').textContent=`選取 ${dx}×${dy}×${dz} ＝ ${(dx*dy*dz).toLocaleString()} 格${dx*dy*dz>16e6?'（超過 1,600 萬格上限，請縮小）':''}`}
+  else $('#wi').textContent=`共 ${WD.cur.length} 個區塊；在地圖上拖曳框選範圍（上方＝北）`}
+const wCk=e=>{const r=wm.getBoundingClientRect(),{s,ox,oz}=WD.v;return[Math.floor((e.clientX-r.left-ox)/s)+WD.bd.a,Math.floor((e.clientY-r.top-oz)/s)+WD.bd.c]};
+wm.onpointerdown=e=>{if(!WD)return;wm.setPointerCapture(e.pointerId);wp0=wCk(e);wm.onpointermove(e)};
+wm.onpointermove=e=>{if(!wp0)return;const q=wCk(e);$('#wx1').value=Math.min(wp0[0],q[0])*16;$('#wx2').value=Math.max(wp0[0],q[0])*16+15;$('#wz1').value=Math.min(wp0[1],q[1])*16;$('#wz2').value=Math.max(wp0[1],q[1])*16+15;wDraw()};
+wm.onpointerup=()=>{wp0=null};
+wIn.forEach(i=>$('#'+i).oninput=wDraw);$('#wd').onchange=wDim;
+async function wBuild(){
+  if(!WD)return;const v=wIn.map(i=>$('#'+i).value);if(v.some(x=>x===''))return say('請先在地圖上拖曳框選區域',1);
+  const[a1,a2,b1,b2,c1,c2]=v.map(x=>Math.round(+x)),x0=Math.min(a1,a2),x1=Math.max(a1,a2),z0=Math.min(b1,b2),z1=Math.max(b1,b2),y0=Math.min(c1,c2),y1=Math.max(c1,c2),
+  X=x1-x0+1,Y=y1-y0+1,Z=z1-z0+1,n=X*Y*Z,dm=+$('#wd').value;
+  if(!(n>0))return say('範圍數值不正確',1);if(n>16e6)return say('選取範圍過大（上限約 1,600 萬格），請縮小範圍',1);
+  const l0=new Array(n).fill(-1),l1=new Array(n).fill(-1),UP=[],um=new Map(),BE={},
+  rp=q=>{const k=q.name+JSON.stringify(q.states,(_,x)=>typeof x=='bigint'?String(x):x);let i=um.get(k);if(i==null){i=UP.length;UP.push(q);um.set(k,i)}return i},
+  kk=(cx,cz,t,y)=>wI32(cx)+wI32(cz)+(dm?wI32(dm):'')+String.fromCharCode(t)+(y==null?'':String.fromCharCode(y&255)),
+  ins=(x,y,z)=>x>=x0&&x<=x1&&y>=y0&&y<=y1&&z>=z0&&z<=z1;
+  try{let k=0;const tot=((x1>>4)-(x0>>4)+1)*((z1>>4)-(z0>>4)+1);
+    for(let cx=x0>>4;cx<=x1>>4;cx++)for(let cz=z0>>4;cz<=z1>>4;cz++){
+      if(k++%6==0){say(`轉換中… ${k}/${tot} 區塊`);await wTick()}
+      for(let sy=y0>>4;sy<=y1>>4;sy++){const e=WD.db.get(kk(cx,cz,47,sy));if(!e||!e.t)continue;
+        wSub(e.v).forEach((ly,li)=>{if(li>1)return;const mp=ly.pal.map(rp);
+          for(let i=0;i<4096;i++){const wx=cx*16+(i>>8),wz=cz*16+(i>>4&15),wy=sy*16+(i&15);if(ins(wx,wy,wz))(li?l1:l0)[((wx-x0)*Y+wy-y0)*Z+wz-z0]=mp[ly.ix[i]]}})}
+      const be=WD.db.get(kk(cx,cz,49));
+      if(be&&be.t){const b=be.v;let p=0;while(p<b.length){try{const r=nbt(b.subarray(p),true);p+=nbt.e;if(ins(r.x,r.y,r.z))BE[((r.x-x0)*Y+r.y-y0)*Z+r.z-z0]={block_entity_data:r}}catch(e){break}}}}
+    const s=fromBE({size:[X,Y,Z],structure:{block_indices:[l0,l1],palette:{default:{block_palette:UP,block_position_data:BE}}}});
+    base=WD.base;say('');await load(s.pal,s.B)}
+  catch(e){say('轉換失敗：'+e.message,1)}}
+$('#wGo').onclick=wBuild;
+async function openWorld(u,f){
+  const m=wUnz(u),fs=[...m.keys()].filter(k=>/(^|\/)db\/[^/]+\.(ldb|log)$/.test(k));
+  if(!fs.length)throw Error('找不到 db/ 世界資料（需為基岩版 .mcworld）');
+  const db=new Map();let i=0;
+  for(const k of fs){say(`讀取世界資料庫 ${++i}/${fs.length}…`);await wTick();const d=wGet(u,m.get(k));/\.log$/.test(k)?wLog(d,db):wLdb(d,db)}
+  for(const[k,e]of[...db])if(!e.t)db.delete(k);
+  const ch=wScan(db),ds=Object.keys(ch);if(!ds.length)throw Error('世界中找不到區塊資料（可能是舊版地形格式）');
+  WD={db,ch,base:(f.name.replace(/\.[^.]*$/,'').replace(/[^\w\u4e00-\u9fff-]+/g,'_')||'world')+'_region'};
+  $('#wd').innerHTML=ds.map(d=>`<option value="${d}">${{0:'主世界',1:'地獄',2:'終界'}[d]||'維度 '+d}（${ch[d].size} 區塊）</option>`).join('');
+  $('#wp').style.display='block';wDim();say('世界已載入，請在地圖上框選要轉換的區域');setTimeout(rs,50)}
+
 // ---------- 匯入 ----------
 async function openFile(f){
   try{say('讀取中…');await new Promise(r=>setTimeout(r,30));
-    let u=new Uint8Array(await f.arrayBuffer());if(u[0]==0x1f&&u[1]==0x8b)u=await gunzip(u);
+    let u=new Uint8Array(await f.arrayBuffer());if(u[0]==0x50&&u[1]==0x4b){await openWorld(u,f);return}$('#wp').style.display='none';setTimeout(rs,50);if(u[0]==0x1f&&u[1]==0x8b)u=await gunzip(u);
     const s=fromNBT(nbt(u,isLE(u)));base=f.name.replace(/\.[^.]*$/,'').replace(/[^\w\u4e00-\u9fff-]+/g,'_')||'model';load(s.pal,s.B)}
   catch(e){say('無法解析此檔案：'+e.message,1)}}
 $('#fi').onchange=e=>{const f=e.target.files[0];f&&openFile(f)};
