@@ -9,22 +9,22 @@
 :root{--bg:#f3f3f0;--fg:#1d1d1b;--sf:#fff;--bd:#d6d6d0;--mu:#6a6a64;--ac:#2e7d32;--on:#fff;--st:#e6e6e0;--er:#c62828;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151513;--fg:#ecece7;--sf:#222220;--bd:#3a3a36;--mu:#a0a09a;--ac:#6fcf73;--on:#0d1f0e;--st:#1b1b19;--er:#ef7b73}}
 :root[data-theme="dark"]{--bg:#151513;--fg:#ecece7;--sf:#222220;--bd:#3a3a36;--mu:#a0a09a;--ac:#6fcf73;--on:#0d1f0e;--st:#1b1b19;--er:#ef7b73}
-html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+html{height:100%;height:100dvh;scroll-padding-top:env(safe-area-inset-top,0px)}
 body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;display:flex;flex-direction:column;overflow:hidden}
-header,footer{background:var(--sf);padding:8px 12px;display:flex;gap:8px;align-items:center}
+header,footer{flex:none;background:var(--sf);padding:8px 12px;display:flex;gap:8px;align-items:center} /* 頁首／頁尾永遠不縮小，不會被擠出畫面 */
 header{border-bottom:1px solid var(--bd)}header b{flex:1;font-size:15px}
 footer{border-top:1px solid var(--bd);flex-direction:column;align-items:stretch;gap:6px}
 button,.btn{font:inherit;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--sf);color:var(--fg);cursor:pointer;text-align:center}
 .pri{background:var(--ac);color:var(--on);border-color:var(--ac);font-weight:600}
 button:disabled{opacity:.4}
-#stage{flex:1;min-height:0;position:relative;background:var(--st)}
+#stage{flex:1;min-height:min(160px,25vh);position:relative;background:var(--st)}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
 #hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mu);pointer-events:none}
 .row{display:flex;gap:8px;align-items:center}.row button{flex:1}
 #ks,.wn,#wd{width:64px;font:inherit;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
 #info{font-size:13px;color:var(--mu)}#msg{font-size:13px}#msg.err{color:var(--er)}
 details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;padding-left:20px}
-#tp{flex:none;max-height:36vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
+#tp{flex:0 1 auto;min-height:0;max-height:30vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
 #tp h4{margin:0;font-size:13px;flex:1}.tn{font-size:12px;color:var(--mu);margin:6px 0}
 #tl{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .tc{border:1px solid var(--bd);border-radius:8px;padding:6px;background:var(--bg);font-size:12px;word-break:break-all}
@@ -32,10 +32,11 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 .tc canvas{position:static;inset:auto;width:40px;height:40px;touch-action:auto;image-rendering:pixelated;border:1px solid var(--bd);border-radius:4px;cursor:pointer;background:repeating-conic-gradient(#888 0 25%,#bbb 0 50%) 0 0/8px 8px}
 .tc button{padding:0 6px;font-size:11px}
 #wd{width:auto}
-#wp{flex:none;max-height:44vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
+#wp{flex:0 1 auto;min-height:0;max-height:40vh;overflow:auto;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:none}
 #wp h4{margin:0;font-size:13px;flex:1}
 #wm{position:static;inset:auto;width:100%;height:220px;margin-top:6px;border:1px solid var(--bd);border-radius:8px;background:var(--st);cursor:crosshair}
 .wg{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:6px 0}
+@supports(-webkit-touch-callout:none){footer{padding-bottom:calc(8px + 28px)}} /* iOS Safari：底部工具列會浮在畫面上，多留一點空間讓匯出按鈕不被蓋住 */
 </style>
 </head>
 <body>
