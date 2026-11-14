@@ -37,11 +37,18 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 #wm{position:static;inset:auto;width:100%;height:220px;margin-top:6px;border:1px solid var(--bd);border-radius:8px;background:var(--st);cursor:crosshair}
 .wg{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:6px 0}
 @supports(-webkit-touch-callout:none){footer{padding-bottom:calc(8px + 28px)}} /* iOS Safari：底部工具列會浮在畫面上，多留一點空間讓匯出按鈕不被蓋住 */
+#tb{position:absolute;left:6px;top:6px;right:6px;display:none;flex-wrap:wrap;gap:4px;pointer-events:none}
+#tb button{pointer-events:auto;padding:3px 8px;font-size:12px;opacity:.92}
+#tb .on{background:var(--ac);color:var(--on);border-color:var(--ac)}
+#yc{position:absolute;left:6px;right:6px;bottom:6px;display:none;align-items:center;gap:8px;font-size:12px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:2px 8px;opacity:.92}
+#yc input{flex:1;min-width:0}
 </style>
 </head>
 <body>
 <header><b>🧱 MC 結構轉 3D 模型</b><label class="btn pri">匯入結構／世界檔<input type="file" id="fi" hidden></label><button id="bS">範例</button></header>
-<div id="stage"><canvas id="cv"></canvas><div id="hint">點右上「匯入結構／世界檔」選擇 .nbt／.schem／.litematic／.mcstructure／.mcworld，<br>或將檔案拖曳到此處</div></div>
+<div id="stage"><canvas id="cv"></canvas><div id="hint">點右上「匯入結構／世界檔」選擇 .nbt／.schem／.litematic／.mcstructure／.mcworld，<br>或將檔案拖曳到此處</div>
+<div id="tb"><button data-v="iso">斜視</button><button data-v="top">俯視</button><button data-v="front">前視</button><button data-v="side">側視</button><button data-t="r">⟳ 旋轉</button><button data-t="g" class="on">格線</button><button data-t="w">線框</button><button data-t="l" class="on">明暗</button><button data-t="b">背景</button><button data-t="p">📷 截圖</button></div>
+<div id="yc">高度切片（僅預覽）<input type="range" id="ycl" min="1" max="1" value="1"><span id="yv"></span></div></div>
 <section id="wp"><div class="row"><h4>🌍 選擇世界區域</h4><select id="wd"></select></div>
 <canvas id="wm"></canvas><div class="tn" id="wi"></div>
 <div class="wg"><label>X <input class="wn" id="wx1" type="number"> ~ <input class="wn" id="wx2" type="number"></label><label>Z <input class="wn" id="wz1" type="number"> ~ <input class="wn" id="wz2" type="number"></label><label>Y <input class="wn" id="wy1" type="number"> ~ <input class="wn" id="wy2" type="number"></label></div>
@@ -52,6 +59,7 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 <footer>
 <div id="info">尚未載入結構</div><div id="msg"></div>
 <div class="row"><label>縮放 <input id="ks" type="number" value="1" min="0.001" step="any"></label><button id="bO" disabled>匯出 OBJ</button><button id="bT" disabled>匯出 STL</button></div>
+<div class="row"><label><input type="checkbox" id="kc"> 原點置中</label><button id="bG" disabled>匯出 GLB</button><button id="bM" disabled>材料清單 CSV</button></div>
 <details><summary>使用說明</summary><ol>
 <li>在 Minecraft（Java 版）蓋好建築，用結構方塊（/give @s structure_block）框住並選「儲存」。</li>
 <li>檔案在 saves/世界名稱/generated/minecraft/structures/名稱.nbt。也可匯入 WorldEdit 或 Litematica 的 .schem／.litematic。</li>
@@ -59,7 +67,7 @@ details{font-size:13px;color:var(--mu)}summary{cursor:pointer}ol{margin:4px 0 0;
 <li>匯出為 .zip：OBJ 內含 .obj＋.mtl（依方塊上色，可用 Blender／MeshLab 開啟），STL 無顏色，適合 3D 列印。縮放 1 ＝ 每格 1 單位。</li>
 <li>植物（草、花、樹苗、作物、藤蔓等）以十字或田字平面顯示，其他非完整方塊（活板門、柵欄門、梯子、告示牌、花盆、箱子、燈籠…）也會依實際形狀顯示；STL 會把植物平面加厚成薄片。</li>
 <li>旗幟的花紋（結構檔內的 Patterns）會以程式繪製的近似圖樣顯示，並非 Mojang 原圖；匯出 OBJ 時會一併輸出旗面貼圖。</li>
-<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖（依各區塊最上層方塊的顏色繪製的俯視圖，草地綠、水藍、沙黃、雪白…；水越深越暗，玻璃與植物會略過；地獄顯示洞穴地面；區塊多時會邊讀邊畫），拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍每軸上限 999 格（999×999×999）；轉換時只記錄「有方塊」的格子位置，空氣不佔記憶體，所以空曠的大範圍也不會配置整個長方體的陣列，實際能否處理取決於範圍內的方塊數量與瀏覽器記憶體，過大時會提示縮小；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
+<li>載入結構後，程式會自動從 Mojang 官方 GitHub（Mojang/bedrock-samples）下載原版方塊貼圖，需要網路；離線或找不到對應貼圖時，改用程式產生的 MC 風格材質。可在下方方塊清單替換成自己的圖片，或匯入自己的材質包／遊戲 jar（優先於官方貼圖）。</li><li>預覽操作：單指拖曳旋轉、雙指縮放並可平移（滑鼠右鍵或 Shift＋拖曳也能平移，雙擊回到斜視）；上方工具列可切換視角、自動旋轉、線框、背景與截圖，底部滑桿可只看到指定高度（僅預覽，不影響匯出）。</li><li>匯出 GLB 內含貼圖，可直接用於 Blender／Unity／Sketchfab／AR；「原點置中」會把模型 X／Z 中心移到原點（OBJ、STL、GLB 皆適用）；「材料清單 CSV」列出每種方塊的數量與組數（可用 Excel 開啟）。</li><li>基岩版世界：在遊戲中選「匯出世界」得到 .mcworld，直接匯入後會出現區塊地圖（依各區塊最上層方塊的顏色繪製的俯視圖，草地綠、水藍、沙黃、雪白…；水越深越暗，玻璃與植物會略過；地獄顯示洞穴地面；區塊多時會邊讀邊畫），拖曳框選要轉換的範圍（可再微調 X／Z／Y 座標），按「轉成 3D 模型」即可預覽並匯出 OBJ／STL。範圍每軸上限 999 格（999×999×999）；轉換時只記錄「有方塊」的格子位置，空氣不佔記憶體，所以空曠的大範圍也不會配置整個長方體的陣列，實際能否處理取決於範圍內的方塊數量與瀏覽器記憶體，過大時會提示縮小；Java 版世界需先用結構方塊或 WorldEdit 匯出。</li></ol></details>
 </footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -281,7 +289,7 @@ function fromBE(r){
 
 // ---------- 建立網格 ----------
 async function load(pal,B,sparse){ // sparse＝true：只記錄有方塊的格子（.mcworld 選取範圍用），不配置整個長方體的陣列
-  if(!B.length)return say('沒有找到任何方塊',1);
+  if(!B.length)return say('沒有找到任何方塊',1);LB={pal,B};
   const a=[1e9,1e9,1e9],b=[-1e9,-1e9,-1e9];
   for(let i=0;i<B.length;i+=4)for(let k=0;k<3;k++){const v=B[i+k];if(v<a[k])a[k]=v;if(v>b[k])b[k]=v}
   W=b[0]-a[0]+1;H=b[1]-a[1]+1;L=b[2]-a[2]+1;
@@ -315,7 +323,7 @@ function cam(){if(!rd)return;R=Math.min(Math.max(R,2),4000);cmr.position.set(tg.
 function show(){
   const nf=F.length/5+E.length/8+V.length/8*2+SQ.length/21*2;
   $('#info').textContent=`尺寸 ${W}×${H}×${L}　方塊 ${cnt}　面 ${nf}　三角形 ${nf*2}`;
-  $('#bO').disabled=$('#bT').disabled=false;$('#hint').style.display='none';say('');tl();
+  $('#bO').disabled=$('#bT').disabled=$('#bG').disabled=$('#bM').disabled=false;$('#tb').style.display=$('#yc').style.display=rd?'flex':'none';$('#hint').style.display='none';say('');tl();
   if(!rd)return;
   const A=atlas();AC=A.cols;const pos=new Float32Array(nf*18),cl=new Uint8Array(nf*18),uv=new Float32Array(nf*12);let o=0,u=0;
   for(let i=0;i<F.length;i+=5){const x=F[i],y=F[i+1],z=F[i+2],dd=F[i+3],v=D[dd],c=v[3],s=v[4]*255,t=F[i+4]*3+(dd==2?0:dd==3?2:1),tc=t%AC,tr=t/AC|0;
@@ -328,20 +336,37 @@ function show(){
   for(let i=0;i<SQ.length;i+=21){const t=SQ[i+20]*3+1,tc=t%AC,tr=t/AC|0;
     for(const bs2 of[0,1])for(const j of bs2?[0,3,2,0,2,1]:Q){const k=i+j*5;pos[o]=SQ[k];pos[o+1]=SQ[k+1];pos[o+2]=SQ[k+2];cl[o]=cl[o+1]=cl[o+2]=255;o+=3;uv[u++]=(tc+.03+SQ[k+3]*.94)/AC;uv[u++]=1-(tr+.03+(1-SQ[k+4])*.94)/AC}}
   if(mesh){scn.remove(mesh);mesh.geometry.dispose()}if(gr)scn.remove(gr);
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(cl,3,true));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  GEO={pos,uv};const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(cl,3,true));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
   mesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,map:mkT(A.c),alphaTest:.3}));scn.add(mesh);
-  const n=Math.ceil((Math.max(W,L)+6)/2)*2;gr=new THREE.GridHelper(n,n,0x888888,0x666666);gr.position.set(Math.round(W/2),-.01,Math.round(L/2));scn.add(gr);
+  const n=Math.ceil((Math.max(W,L)+6)/2)*2;gr=new THREE.GridHelper(n,n,0x888888,0x666666);gr.position.set(Math.round(W/2),-.01,Math.round(L/2));scn.add(gr);vs2();{const s=$('#ycl');s.max=H;s.value=H;ycut()}
   tg.set(W/2,H/2,L/2);R=Math.max(W,H,L)*1.7+4;cam()}
 function rs(){if(!rd)return;const r=$('#stage').getBoundingClientRect();rd.setSize(r.width,r.height,false);cmr.aspect=r.width/r.height;cmr.updateProjectionMatrix();cam()}
 new ResizeObserver(rs).observe($('#stage'));
 const P=new Map();
 cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY])};
 cv.onpointermove=e=>{const o=P.get(e.pointerId);if(!o)return;const n=[e.clientX,e.clientY];
-  if(P.size==1){th-=(n[0]-o[0])*.01;ph=Math.min(3.09,Math.max(.05,ph-(n[1]-o[1])*.01))}
-  else if(P.size==2){const q=[...P].find(([k])=>k!=e.pointerId)[1];R*=Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(n[0]-q[0],n[1]-q[1])}
+  if(P.size==1){if(e.buttons&2||e.shiftKey)pan(n[0]-o[0],n[1]-o[1]);else{th-=(n[0]-o[0])*.01;ph=Math.min(3.09,Math.max(.05,ph-(n[1]-o[1])*.01))}}
+  else if(P.size==2){const q=[...P].find(([k])=>k!=e.pointerId)[1];R*=Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(n[0]-q[0],n[1]-q[1]);pan((n[0]-o[0])/2,(n[1]-o[1])/2)}
   P.set(e.pointerId,n);cam()};
 cv.onpointerup=cv.onpointercancel=e=>P.delete(e.pointerId);
 cv.onwheel=e=>{e.preventDefault();R*=Math.exp(e.deltaY*.001);cam()};
+// ---------- 預覽工具：平移、視角、線框、切片、截圖 ----------
+cv.oncontextmenu=e=>e.preventDefault();cv.ondblclick=()=>mesh&&vw('iso');
+let LB=null,GEO=null;
+const VS={w:0,l:1,g:1,r:0,b:0},BG=['','#9ec9f0','#ffffff','#101010'],VW={iso:[.8,1.1],top:[0,.05],front:[0,1.5708],side:[1.5708,1.5708]},
+pan=(dx,dy)=>{cmr.updateMatrixWorld();const s=2*R*Math.tan(Math.PI/8)/Math.max(1,$('#stage').clientHeight),m=cmr.matrixWorld;
+  tg.addScaledVector(new THREE.Vector3().setFromMatrixColumn(m,0),-dx*s).addScaledVector(new THREE.Vector3().setFromMatrixColumn(m,1),dy*s)},
+vw=a=>{[th,ph]=VW[a];tg.set(W/2,H/2,L/2);R=Math.max(W,H,L)*1.7+4;cam()},
+vs2=()=>{if(!mesh)return;const m=mesh.material;m.wireframe=!!VS.w;m.vertexColors=!!VS.l;m.needsUpdate=true;gr.visible=!!VS.g;cam()},
+ycut=()=>{const v=+$('#ycl').value;$('#yv').textContent=v>=H?'全部':'1–'+v+' 層';rd.clippingPlanes=v>=H?[]:[new THREE.Plane(new THREE.Vector3(0,-1,0),v)];cam()},
+ctr=()=>$('#kc').checked?[W/2,0,L/2]:[0,0,0];
+$('#ycl').oninput=()=>rd&&mesh&&ycut();
+$('#tb').onclick=e=>{const b=e.target.closest('button');if(!b||!rd||!mesh)return;const{v,t}=b.dataset;
+  if(v)vw(v);
+  else if(t=='p'){cam();cv.toBlob(x=>x&&save(base+'.png',x))}
+  else if(t=='b'){VS.b=(VS.b+1)%BG.length;$('#stage').style.background=BG[VS.b]}
+  else{VS[t]=VS[t]?0:1;b.classList.toggle('on',!!VS[t]);vs2()}};
+(function lp(){requestAnimationFrame(lp);if(VS.r&&rd&&mesh&&!P.size){th+=.006;cam()}})();
 
 // ---------- 材質 ----------
 const hs=s=>{let h=7;for(const c of s)h=Math.imul(h,31)+c.charCodeAt(0)|0;return h},
@@ -708,9 +733,9 @@ function bx2(n,p){
 // ---------- 匯出 ----------
 const mn=p=>N[p].replace(/^.*:/,'').replace(/\W/g,'_');
 async function obj(k){
-  const vm=new Map(),vs=[],tm=new Map(),vts=[],by=new Map(),n4=v=>+(v*k).toFixed(4),
-  S=(x,y,z)=>{const q=(Math.round((x+2)*160)*((H+4)*160+1)+Math.round((y+2)*160))*((L+4)*160+1)+Math.round((z+2)*160);let i=vm.get(q);if(!i){vs.push('v '+n4(x)+' '+n4(y)+' '+n4(z));i=vs.length;vm.set(q,i)}return i},
-  SV=(x,y,z)=>{vs.push('v '+n4(x)+' '+n4(y)+' '+n4(z));return vs.length},
+  const O=ctr(),vm=new Map(),vs=[],tm=new Map(),vts=[],by=new Map(),n4=v=>+(v*k).toFixed(4),
+  S=(x,y,z)=>{const q=(Math.round((x+2)*160)*((H+4)*160+1)+Math.round((y+2)*160))*((L+4)*160+1)+Math.round((z+2)*160);let i=vm.get(q);if(!i){vs.push('v '+n4(x-O[0])+' '+n4(y-O[1])+' '+n4(z-O[2]));i=vs.length;vm.set(q,i)}return i},
+  SV=(x,y,z)=>{vs.push('v '+n4(x-O[0])+' '+n4(y-O[1])+' '+n4(z-O[2]));return vs.length},
   T2=(u,v)=>{const q=u+' '+v;let i=tm.get(q);if(!i){vts.push('vt '+q);i=vts.length;tm.set(q,i)}return i},
   add=(d,p,X0,Y0,Z0,X1,Y1,Z1)=>{const c=D[d][3],ox=Math.floor(X0),oy=Math.floor(Y0),oz=Math.floor(Z0),s=sp(N[p])?(d==2?0:d==3?2:1):1,
     q=[0,1,2,3].map(j=>{const X=c[j*3]?X1:X0,Y=c[j*3+1]?Y1:Y0,Z=c[j*3+2]?Z1:Z0,[lu,lv]=uvf(d,X-ox,Y-oy,Z-oz);return S(X,Y,Z)+'/'+T2(lu,lv)}),key=p*3+s;
@@ -762,11 +787,36 @@ async function save(name,blob){
   if(dl){try{await dl.save({filename:name,data:blob});say('已儲存 '+name)}catch(e){if(e.code!='declined')say('儲存失敗（'+(e.code||e.message)+'）',1)}}
   else if(window.claude)say('此環境不支援下載',1);
   else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1e4)}}
+// STL：把 X／Y 中心移到原點（底面維持在 Z=0）
+const stc=(u,k)=>{if(!$('#kc').checked)return u;const dv=new DataView(u.buffer),n=dv.getUint32(80,true);
+  for(let i=0;i<n;i++)for(let j=0;j<3;j++){const o=96+i*50+j*12;dv.setFloat32(o,dv.getFloat32(o,true)-W/2*k,true);dv.setFloat32(o+4,dv.getFloat32(o+4,true)-L/2*k,true)}return u};
+// GLB：沿用預覽網格（單張貼圖圖集），貼圖為目前使用的版本
+async function glb(k){
+  if(!GEO)throw Error('需要 3D 預覽（WebGL）才能匯出 GLB');
+  const pg=await png(atlas().c),O=ctr(),{pos,uv}=GEO,n=pos.length/3,P2=new Float32Array(pos.length),U2=new Float32Array(uv.length),mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
+  for(let i=0;i<n;i++){for(let a=0;a<3;a++){const v=(pos[i*3+a]-O[a])*k;P2[i*3+a]=v;if(v<mn[a])mn[a]=v;if(v>mx[a])mx[a]=v}U2[i*2]=uv[i*2];U2[i*2+1]=1-uv[i*2+1]}
+  const pb=P2.byteLength,ub=U2.byteLength,ib=pg.length,pd=x=>x+3&~3,bl=pd(pb+ub+ib),
+  jb=new TextEncoder().encode(JSON.stringify({asset:{version:'2.0',generator:'MC structure to model'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0,name:base}],
+    meshes:[{primitives:[{attributes:{POSITION:0,TEXCOORD_0:1},material:0}]}],
+    materials:[{pbrMetallicRoughness:{baseColorTexture:{index:0},metallicFactor:0,roughnessFactor:1},alphaMode:'MASK',alphaCutoff:.3}],
+    textures:[{source:0,sampler:0}],images:[{bufferView:2,mimeType:'image/png'}],samplers:[{magFilter:9728,minFilter:9728}],
+    accessors:[{bufferView:0,componentType:5126,count:n,type:'VEC3',min:mn,max:mx},{bufferView:1,componentType:5126,count:n,type:'VEC2'}],
+    bufferViews:[{buffer:0,byteOffset:0,byteLength:pb},{buffer:0,byteOffset:pb,byteLength:ub},{buffer:0,byteOffset:pb+ub,byteLength:ib}],buffers:[{byteLength:bl}]})),
+  jl=pd(jb.length),o=new Uint8Array(28+jl+bl),dv=new DataView(o.buffer),b0=28+jl;
+  dv.setUint32(0,0x46546C67,true);dv.setUint32(4,2,true);dv.setUint32(8,o.length,true);
+  dv.setUint32(12,jl,true);dv.setUint32(16,0x4E4F534A,true);o.fill(32,20,20+jl);o.set(jb,20);
+  dv.setUint32(20+jl,bl,true);dv.setUint32(24+jl,0x004E4942,true);
+  o.set(new Uint8Array(P2.buffer),b0);o.set(new Uint8Array(U2.buffer),b0+pb);o.set(pg,b0+pb+ub);return o}
+// 材料清單：依方塊名稱統計（門／高植物只算一次、雙層半磚算兩個），輸出 UTF-8 CSV
+async function mat(){if(!LB)return;const m=new Map(),{pal,B}=LB;
+  for(let i=3;i<B.length;i+=4){const s=pal[B[i]];if(/half=upper|part=head/.test(s))continue;const n=s.replace(/\[.*$/,'');m.set(n,(m.get(n)||0)+(/type=double/.test(s)?2:1))}
+  const q=s=>'"'+String(s).replace(/"/g,'""')+'"',r=[...m].sort((a,b)=>b[1]-a[1]);
+  await save(base+'_materials.csv',new Blob(['\ufeff'+['中文名稱,方塊 ID,數量,組數（每組 64）',...r.map(([n,c])=>[q(zh(n)),n,c,q(Math.floor(c/64)+' 組 + '+c%64)].join(','))].join('\n')],{type:'text/csv'}))}
 async function ex(t){
   if(!F.length)return;const k=parseFloat($('#ks').value)||1;
   say('產生檔案中…');await new Promise(r=>setTimeout(r,30));
   try{const te=new TextEncoder();let fs;
-    if(t=='obj'){const[a,m,ps]=await obj(k);fs=[{n:base+'.obj',d:te.encode(a)},{n:base+'.mtl',d:te.encode(m)},...ps]}else fs=[{n:base+'.stl',d:stl(k)}];
+    if(t=='obj'){const[a,m,ps]=await obj(k);fs=[{n:base+'.obj',d:te.encode(a)},{n:base+'.mtl',d:te.encode(m)},...ps]}else if(t=='glb'){say('');return await save(base+'.glb',new Blob([await glb(k)],{type:'model/gltf-binary'}))}else fs=[{n:base+'.stl',d:stc(stl(k),k)}];
     say('');await save(base+'_'+t+'.zip',zip(fs))}catch(e){say('匯出失敗：'+e.message,1)}}
 
 // ---------- .mcworld（基岩版世界）匯入 ----------
@@ -809,10 +859,13 @@ function wLog(u,db){let rec=[],p=0;
 // 子區塊（16×16×16）：回傳每個儲存層 {pal:[{name,states}], ix:Uint16Array(4096)}，索引＝(x*16+z)*16+y
 function wSub(v){let p=0;const ver=v[p++];if(ver!=1&&ver<8)return[];const n=ver==1?1:v[p++];if(ver>=9)p++;
   const dv=new DataView(v.buffer,v.byteOffset,v.byteLength),ls=[];
-  for(let s=0;s<n;s++){const bits=v[p++]>>1,ix=new Uint16Array(4096);
+  try{for(let s=0;s<n;s++){const bits=v[p++]>>1,ix=new Uint16Array(4096);
     if(bits){const per=Math.floor(32/bits),m=(1<<bits)-1;for(let i=0;i<4096;i++)ix[i]=dv.getUint32(p+4*Math.floor(i/per),true)>>>(i%per*bits)&m;p+=4*Math.ceil(4096/per)}
-    const np=dv.getInt32(p,true);p+=4;const pal=[];for(let i=0;i<np;i++){pal.push(nbt(v.subarray(p),true));p+=nbt.e}
-    ls.push({pal,ix})}
+    // bits＝0（整個子區塊同一種方塊）：Mojang／Dragonfly 的存檔不會寫調色盤數量，直接就是 1 個 NBT 項目
+    let np=1;if(bits||v[p]!=10){np=dv.getInt32(p,true);p+=4}
+    if(!(np>=1&&np<=65536))throw Error('子區塊調色盤數量異常');
+    const pal=[];for(let i=0;i<np;i++){pal.push(nbt(v.subarray(p),true));p+=nbt.e}
+    ls.push({pal,ix})}}catch(e){wSub.bad=(wSub.bad||0)+1}  // 個別子區塊損毀時跳過，不讓整個轉換失敗
   return ls}
 function wScan(db){const ch={};for(const[k,e]of db){if(!e.t)continue;const t=k.length,ty=t==9?k.charCodeAt(8):t==13?k.charCodeAt(12):k.charCodeAt(t-2);
     if(ty!=44&&ty!=118&&ty!=47)continue;const g=i=>k.charCodeAt(i)|k.charCodeAt(i+1)<<8|k.charCodeAt(i+2)<<16|k.charCodeAt(i+3)<<24;
@@ -920,7 +973,7 @@ async function wBuild(){
   const[a1,a2,b1,b2,c1,c2]=v.map(x=>Math.round(+x)),x0=Math.min(a1,a2),x1=Math.max(a1,a2),z0=Math.min(b1,b2),z1=Math.max(b1,b2),y0=Math.min(c1,c2),y1=Math.max(c1,c2),
   X=x1-x0+1,Y=y1-y0+1,Z=z1-z0+1,n=X*Y*Z,dm=+$('#wd').value;
   if(!(n>0))return say('範圍數值不正確',1);if(X>999||Y>999||Z>999)return say('選取範圍過大（X／Y／Z 每軸上限 999 格），請縮小範圍',1);
-  let cells=new SG();const UP=[],um=new Map(),BE={},
+  wSub.bad=0;let cells=new SG();const UP=[],um=new Map(),BE={},
   rp=q=>{const k=q.name+JSON.stringify(q.states,(_,x)=>typeof x=='bigint'?String(x):x);let i=um.get(k);if(i==null){i=UP.length;UP.push(q);um.set(k,i)}return i},
   kk=(cx,cz,t,y)=>wI32(cx)+wI32(cz)+(dm?wI32(dm):'')+String.fromCharCode(t)+(y==null?'':String.fromCharCode(y&255)),
   ins=(x,y,z)=>x>=x0&&x<=x1&&y>=y0&&y<=y1&&z>=z0&&z<=z1;
@@ -935,7 +988,7 @@ async function wBuild(){
       const be=WD.db.get(kk(cx,cz,49));
       if(be&&be.t){const b=be.v;let p=0;while(p<b.length){try{const r=nbt(b.subarray(p),true);p+=nbt.e;if(ins(r.x,r.y,r.z))BE[((r.x-x0)*Y+r.y-y0)*Z+r.z-z0]={block_entity_data:r}}catch(e){break}}}}
     const s=fromBE({size:[X,Y,Z],cells,structure:{palette:{default:{block_palette:UP,block_position_data:BE}}}});
-    cells=null;base=WD.base;say('');await load(s.pal,s.B,true)}
+    cells=null;base=WD.base;say('');await load(s.pal,s.B,true);if(wSub.bad)say(`有 ${wSub.bad} 個子區塊資料異常，已略過`,1)}
   catch(e){say('轉換失敗：'+(e instanceof RangeError?'記憶體不足，請縮小範圍':e.message),1)}}
 $('#wGo').onclick=wBuild;
 async function openWorld(u,f){
@@ -957,7 +1010,7 @@ async function openFile(f){
   catch(e){say('無法解析此檔案：'+e.message,1)}}
 $('#fi').onchange=e=>{const f=e.target.files[0];f&&openFile(f)};
 $('#bS').onclick=()=>{const s=sample();base='sample_house';load(s.pal,s.B)};
-$('#bO').onclick=()=>ex('obj');$('#bT').onclick=()=>ex('stl');
+$('#bO').onclick=()=>ex('obj');$('#bT').onclick=()=>ex('stl');$('#bG').onclick=()=>ex('glb');$('#bM').onclick=mat;
 addEventListener('dragover',e=>e.preventDefault());
 addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];f&&openFile(f)});
 </script>
